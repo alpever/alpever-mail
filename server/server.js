@@ -84,10 +84,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Ensure MySQL Server is active on port 3307
+// Ensure MySQL Server is active
 async function ensureMySqlServer() {
   const net = require('net');
-  const port = parseInt(process.env.DB_PORT || '3307', 10);
+  const port = parseInt(process.env.DB_PORT || '3306', 10);
 
   const isPortOpen = () => new Promise(resolve => {
     const socket = new net.Socket();

@@ -184,6 +184,77 @@ router.post('/', async (req, res) => {
   }
 });
 
+// POST /api/campaigns/test-send-direct - Send 1 test email from wizard before campaign creation
+router.post('/test-send-direct', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not connected' });
+
+  try {
+    const { templateId, listId, testEmail, fromName, fromEmail, replyTo } = req.body;
+
+    if (!testEmail) {
+      return res.status(400).json({ error: 'Target test email address is required.' });
+    }
+    if (!templateId) {
+      return res.status(400).json({ error: 'Template is required to send a test email.' });
+    }
+
+    const apiKey = await getStoredSetting('RESEND_API_KEY');
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Resend API key is not configured. Please add it in Settings.' });
+    }
+
+    const [tRows] = await pool.query('SELECT * FROM templates WHERE id = ?', [templateId]);
+    if (!tRows.length) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    const template = tRows[0];
+
+    // Pick first contact from list if provided for realistic variable replacement
+    let sample = {
+      name: 'Valued Partner',
+      company: 'Sample Enterprise',
+      email: testEmail
+    };
+
+    if (listId) {
+      const [sampleContacts] = await pool.query(
+        'SELECT * FROM contacts WHERE list_id = ? LIMIT 1',
+        [listId]
+      );
+      if (sampleContacts.length) {
+        sample = { ...sampleContacts[0], email: testEmail };
+      }
+    }
+
+    const senderName = fromName || (await getStoredSetting('DEFAULT_FROM_NAME', 'Alpever AI'));
+    const senderEmail = fromEmail || (await getStoredSetting('DEFAULT_FROM_EMAIL', 'connect@flow.alpever.com'));
+
+    const rendered = renderEmail(
+      { subject: template.subject, body_html: template.body_html, body_text: template.body_text },
+      sample,
+      { sender_name: senderName }
+    );
+
+    const result = await sendSingleEmail(apiKey, {
+      from: `${senderName} <${senderEmail}>`,
+      to: testEmail,
+      subject: `[TEST] ${rendered.subject}`,
+      html: rendered.html,
+      reply_to: replyTo || undefined
+    });
+
+    res.json({
+      success: true,
+      resendId: result.id,
+      message: `Test email successfully dispatched to ${testEmail}`
+    });
+  } catch (err) {
+    console.error('Test email send error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/campaigns/:id/test-send - Send 1 test email
 router.post('/:id/test-send', async (req, res) => {
   const pool = getPool();

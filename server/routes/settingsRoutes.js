@@ -162,7 +162,7 @@ router.post('/test-db', async (req, res) => {
       // Also update process.env and .env file
       updateEnvFile({
         DB_HOST: host || '127.0.0.1',
-        DB_PORT: String(port || 3307),
+        DB_PORT: String(port || 3306),
         DB_USER: user || 'root',
         DB_PASSWORD: password !== undefined ? password : '',
         DB_NAME: database || 'mass_mailer_db'

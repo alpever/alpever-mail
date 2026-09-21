@@ -156,10 +156,17 @@ function updateWizardConfirmationPreview() {
 async function sendTestEmailFromWizard() {
   const testEmail = document.getElementById('wizard-test-email').value.trim();
   const tplSelect = document.getElementById('wizard-template-select');
-  const templateId = tplSelect.value;
+  const templateId = tplSelect ? tplSelect.value : null;
+  const listSelect = document.getElementById('wizard-list-select');
+  const listId = listSelect ? listSelect.value : null;
 
   if (!testEmail) {
     showToast('Please enter an email address to send test email to.', 'warning');
+    return;
+  }
+
+  if (!templateId) {
+    showToast('Please select a template first.', 'warning');
     return;
   }
 
@@ -168,32 +175,22 @@ async function sendTestEmailFromWizard() {
   btn.textContent = 'Sending...';
 
   try {
-    // If campaign hasn't been created yet, test directly
-    const template = await api.get(`/templates/${templateId}`);
-    const settings = await api.get('/settings');
+    const fromName = document.getElementById('wizard-from-name').value.trim();
+    const fromEmail = document.getElementById('wizard-from-email').value.trim();
+    const replyTo = document.getElementById('wizard-reply-to').value.trim();
 
-    const fromName = document.getElementById('wizard-from-name').value || settings.fromName || 'Alpever AI';
-    const fromEmail = document.getElementById('wizard-from-email').value || settings.fromEmail || 'onboarding@resend.dev';
-
-    const testRes = await api.post('/settings/verify-resend', {}); // check key configured
-    if (!testRes.valid && !settings.hasApiKey) {
-      showToast('Please add your Resend API Key in Settings first!', 'error');
-      btn.disabled = false;
-      btn.textContent = 'Send Test Email';
-      return;
-    }
-
-    // Call single send directly
-    const sendRes = await api.post('/templates/preview', {
-      subject: template.subject,
-      body_html: template.body_html,
-      contact: { name: 'Test Recipient', email: testEmail, company: 'Test Company' }
+    const result = await api.post('/campaigns/test-send-direct', {
+      templateId,
+      listId,
+      testEmail,
+      fromName,
+      fromEmail,
+      replyTo
     });
 
-    // Create a temporary campaign test send or direct send
-    showToast(`Dispatched test email preview to ${testEmail}!`, 'success');
+    showToast(result.message || `Dispatched test email to ${testEmail}!`, 'success');
   } catch (err) {
-    showToast(`Test send failed: ${err.message}`, 'error', 5000);
+    showToast(`Test send failed: ${err.message}`, 'error', 6000);
   } finally {
     btn.disabled = false;
     btn.textContent = 'Send Test Email';
