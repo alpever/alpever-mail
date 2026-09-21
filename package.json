@@ -1,0 +1,24 @@
+{
+  "name": "mass-mailer-resend",
+  "version": "1.0.0",
+  "description": "High-performance personalized mass email application using Resend API and MySQL",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "test": "node test/unit_tests.js",
+    "reset-db": "node scripts/reset-db.js"
+  },
+  "keywords": ["resend", "email", "mass-mailer", "mysql", "personalization"],
+  "author": "Alpever",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "csv-parser": "^3.2.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.12.0",
+    "xlsx": "^0.18.5"
+  }
+}

@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alpever Mail — High-Volume Personalized Mass Mailer</title>
+  <meta name="description"
+    content="Send 10 to 1,000+ personalized emails via Resend API and MySQL with live template preview and real-time delivery logs." />
+
+  <link rel="icon" type="image/png" href="/img/logo.png" />
+  <link rel="stylesheet" href="/css/variables.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/editor.css" />
+</head>
+
+<body>
+  <!-- Ambient Glow Effects -->
+  <div class="ambient-glow"></div>
+  <div class="ambient-glow-2"></div>
+
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img src="/img/logo.png" alt="Alpever" class="brand-logo-img" />
+        <div>
+          <div class="brand-title">Alpever Mail</div>
+          <div class="brand-sub">Personalized Mass Engine</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item active" data-view="dashboard" id="nav-dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+        <a class="nav-item" data-view="contacts" id="nav-contacts">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Audience & Upload</span>
+        </a>
+        <a class="nav-item" data-view="templates" id="nav-templates">
+          <span class="nav-icon">✉️</span>
+          <span class="nav-label">Dynamic Templates</span>
+        </a>
+        <a class="nav-item" data-view="campaigns" id="nav-campaigns">
+          <span class="nav-icon">🚀</span>
+          <span class="nav-label">Mass Campaigns</span>
+        </a>
+        <a class="nav-item" data-view="history" id="nav-history">
+          <span class="nav-icon">📋</span>
+          <span class="nav-label">Delivery Logs</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span>Resend API + MySQL</span>
+        <span style="color: var(--accent-primary); font-weight: 700;">v1.0</span>
+      </div>
+    </aside>
+
+    <!-- Main Viewport -->
+    <main class="main-wrapper">
+      <!-- Top Sticky Header -->
+      <header class="top-header">
+        <div class="page-info">
+          <h1 id="top-page-title">Dashboard Overview</h1>
+        </div>
+
+        <div class="header-status-badges">
+          <div class="status-pill" id="header-db-pill" style="cursor: default;">
+            <span class="status-dot online" id="header-db-dot"></span>
+            <span id="header-db-text">MySQL Connected</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openCreateCampaignModal()">
+            <span>⚡</span> New Campaign
+          </button>
+        </div>
+      </header>
+
+      <!-- Content Views Body -->
+      <div class="content-body">
+
+        <!-- 1. DASHBOARD VIEW -->
+        <section class="view-section active" id="view-dashboard">
+          <!-- Metric Stat Cards -->
+          <div class="grid-stats">
+            <div class="stat-card">
+              <div class="stat-icon indigo">👥</div>
+              <div>
+                <div class="stat-value" id="stat-total-contacts">0</div>
+                <div class="stat-label">Total Contacts Uploaded</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon purple">✉️</div>
+              <div>
+                <div class="stat-value" id="stat-total-templates">0</div>
+                <div class="stat-label">Dynamic Templates</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon emerald">🚀</div>
+              <div>
+                <div class="stat-value" id="stat-total-sent">0</div>
+                <div class="stat-label">Total Emails Dispatched</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon rose">🎯</div>
+              <div>
+                <div class="stat-value" id="stat-success-rate">100%</div>
+                <div class="stat-label">Delivery Success Rate</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Action Shortcuts -->
+          <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">
+            <div class="card" style="cursor: pointer;" onclick="navigateTo('contacts')">
+              <div style="font-size: 28px; margin-bottom: 12px;">📁</div>
+              <h3 style="font-size: 16px; margin-bottom: 6px;">1. Upload Customer Data</h3>
+              <p style="font-size: 13px; color: var(--text-muted);">
+                Drop your CSV or Excel file with 10 to 1,000+ contacts. Automatic header detection for name, company &
+                custom attributes.
+              </p>
+            </div>
+            <div class="card" style="cursor: pointer;" onclick="navigateTo('templates')">
+              <div style="font-size: 28px; margin-bottom: 12px;">🎨</div>
+              <h3 style="font-size: 16px; margin-bottom: 6px;">2. Design Dynamic Template</h3>
+              <p style="font-size: 13px; color: var(--text-muted);">
+                Inject dynamic personalization tags like <code>{{name}}</code>, <code>{{company}}</code> with instant
+                live preview.
+              </p>
+            </div>
+            <div class="card" style="cursor: pointer;" onclick="openCreateCampaignModal()">
+              <div style="font-size: 28px; margin-bottom: 12px;">⚡</div>
+              <h3 style="font-size: 16px; margin-bottom: 6px;">3. Launch Mass Campaign</h3>
+              <p style="font-size: 13px; color: var(--text-muted);">
+                Select audience & template, run a single test email preview, and dispatch mass batches safely via
+                Resend.
+              </p>
+            </div>
+          </div>
+
+          <!-- Recent Campaigns Card -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Recent Campaigns</h2>
+                <p class="card-subtitle">Active and completed delivery runs</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="navigateTo('campaigns')">View All</button>
+            </div>
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Campaign Name</th>
+                    <th>Template</th>
+                    <th>Audience Size</th>
+                    <th>Progress</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-campaigns-list">
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 20px;">Loading campaigns...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. AUDIENCE & CONTACTS VIEW -->
+        <section class="view-section" id="view-contacts">
+          <!-- Dropzone Card -->
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Upload Customer Contacts</h2>
+                <p class="card-subtitle">Upload CSV, Excel (.xlsx, .xls), or JSON files with 10 to 1,000+ customer
+                  records</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="downloadSampleCSV()">
+                📥 Download Sample 10-Customer CSV
+              </button>
+            </div>
+
+            <div class="dropzone" id="contact-dropzone">
+              <input type="file" id="contact-file-input" style="display: none;" accept=".csv, .xlsx, .xls, .json" />
+              <div class="dropzone-icon">☁️</div>
+              <div class="dropzone-title">Click or drag & drop customer file here</div>
+              <div class="dropzone-desc">Supports auto-detection of email, name, company, and all custom tags</div>
+              <div class="dropzone-chips">
+                <span class="chip">.CSV</span>
+                <span class="chip">.XLSX</span>
+                <span class="chip">.XLS</span>
+                <span class="chip">.JSON</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Uploaded Lists Grid -->
+          <div class="card">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;"
+              id="audience-lists-grid">
+              <div style="padding: 20px; color: var(--text-dim);">Loading audience lists...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. DYNAMIC TEMPLATES VIEW -->
+        <section class="view-section" id="view-templates">
+          <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Dynamic Email Templates</h2>
+                <p class="card-subtitle">Templates with dynamic tags ({{name}}, {{company}}, {{custom_tag}}) & live
+                  preview</p>
+              </div>
+              <button class="btn btn-primary" onclick="openTemplateEditor()">
+                <span>+</span> New Template
+              </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;"
+              id="templates-grid">
+              <div style="padding: 20px; color: var(--text-dim);">Loading templates...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. MASS CAMPAIGNS VIEW -->
+        <section class="view-section" id="view-campaigns">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Mass Email Campaigns</h2>
+                <p class="card-subtitle">Dispatch personalized emails at scale with Resend queue</p>
+              </div>
+              <button class="btn btn-primary" onclick="openCreateCampaignModal()">
+                <span>🚀</span> Launch New Campaign
+              </button>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Campaign & Sender</th>
+                    <th>Audience List</th>
+                    <th>Template</th>
+                    <th>Recipients</th>
+                    <th>Delivery Progress</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="campaigns-table-tbody">
+                  <tr>
+                    <td colspan="7" style="text-align: center; padding: 20px;">Loading campaigns...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. HISTORY & AUDIT LOGS VIEW -->
+        <section class="view-section" id="view-history">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Delivery Audit Logs</h2>
+                <p class="card-subtitle">Detailed recipient-by-recipient logs and delivery statuses</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="exportCampaignLogsCSV()">
+                📥 Export Report as CSV
+              </button>
+            </div>
+
+            <!-- Campaign Selector & Filters -->
+            <div
+              style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+              <div style="min-width: 280px;">
+                <label class="form-label" style="margin-bottom: 4px;">Select Campaign:</label>
+                <select class="form-select" id="history-campaign-select" onchange="onHistoryCampaignChange()"></select>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm log-filter-btn active" data-status=""
+                  onclick="filterLogsByStatus('')">All</button>
+                <button class="btn btn-secondary btn-sm log-filter-btn" data-status="sent"
+                  onclick="filterLogsByStatus('sent')">Sent</button>
+                <button class="btn btn-secondary btn-sm log-filter-btn" data-status="failed"
+                  onclick="filterLogsByStatus('failed')">Failed</button>
+                <button class="btn btn-secondary btn-sm log-filter-btn" data-status="pending"
+                  onclick="filterLogsByStatus('pending')">Pending</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Log ID</th>
+                    <th>Recipient Name</th>
+                    <th>Email Address</th>
+                    <th>Status</th>
+                    <th>Resend Message ID / Error</th>
+                    <th>Sent At</th>
+                  </tr>
+                </thead>
+                <tbody id="history-logs-tbody">
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 20px;">Select a campaign to view logs</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="history-logs-pagination"></div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL: VIEW AUDIENCE CONTACTS -->
+  <div class="modal-backdrop" id="modal-contacts">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-contacts-title">Audience Contacts</h3>
+        <button class="btn-icon" onclick="closeModal('modal-contacts')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 16px;">
+          <input type="text" class="form-input" id="modal-contacts-search"
+            placeholder="Search by name, email, or company..."
+            oninput="viewContactsModal(currentViewingListId, document.getElementById('modal-contacts-title').textContent.replace('Audience: ', ''), 1)" />
+        </div>
+        <div class="table-container">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Company</th>
+                <th>Custom Tags</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="modal-contacts-tbody"></tbody>
+          </table>
+        </div>
+        <div id="modal-contacts-pagination"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-contacts')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DYNAMIC TEMPLATE STUDIO -->
+  <div class="modal-backdrop" id="modal-template-editor">
+    <div class="modal-dialog modal-lg" style="max-width: 1240px; width: 95vw;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="template-editor-title">Dynamic Template Studio</h3>
+        <button class="btn-icon" onclick="closeModal('modal-template-editor')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="template-editor-grid">
+          <!-- Left Editor Pane -->
+          <div class="editor-pane">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Template Name:</label>
+                <input type="text" class="form-input" id="tpl-input-name" placeholder="e.g. VIP Product Invitation" />
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Email Subject:</label>
+                <input type="text" class="form-input" id="tpl-input-subject"
+                  placeholder="e.g. Quick question for {{name}} at {{company}}" />
+              </div>
+            </div>
+
+            <!-- Variable Tags Toolbar -->
+            <div>
+              <label class="form-label" style="margin-bottom: 6px;">Click to inject Dynamic Variable:</label>
+              <div class="tag-pills-container" id="tag-pills-wrap">
+                <span class="tag-pill" onclick="insertVariableTag('{{name}}')">+ {{name}}</span>
+                <span class="tag-pill" onclick="insertVariableTag('{{company}}')">+ {{company}}</span>
+                <span class="tag-pill" onclick="insertVariableTag('{{email}}')">+ {{email}}</span>
+                <span class="tag-pill" onclick="insertVariableTag('{{place}}')">+ {{place}}</span>
+                <span class="tag-pill" onclick="insertVariableTag('{{role}}')">+ {{role}}</span>
+                <span class="tag-pill" onclick="insertVariableTag('{{company | \'your company\'}}')">+ {{company | 'fallback'}}</span>
+                <span class="tag-pill" style="border-style: dashed; background: #ffffff; color: var(--brand-orange);" onclick="promptCustomVariableTag()">+ Custom Tag...</span>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <!-- Visual vs HTML Code Mode Switcher -->
+              <div class="editor-mode-tabs">
+                <label class="form-label" style="margin-bottom: 0;" id="editor-mode-label">Email Content (Visual Mode):</label>
+                <div class="editor-tabs-group">
+                  <button type="button" class="editor-tab-btn active" id="btn-tab-visual" onclick="switchEditorMode('visual')">
+                    ✏️ Visual Editor
+                  </button>
+                  <button type="button" class="editor-tab-btn" id="btn-tab-code" onclick="switchEditorMode('code')">
+                    💻 HTML Code
+                  </button>
+                </div>
+              </div>
+
+              <!-- Visual Editor Container (Default for non-coders) -->
+              <div id="visual-editor-container">
+                <!-- Formatting Toolbar -->
+                <div class="visual-toolbar">
+                  <div class="toolbar-btn-group">
+                    <select class="form-select" id="t-font-style" onchange="applyBlockStyle(this.value)" style="padding: 3px 8px; font-size: 12px; width: 110px; height: 28px;">
+                      <option value="p">Paragraph</option>
+                      <option value="h1">Heading 1</option>
+                      <option value="h2">Heading 2</option>
+                      <option value="h3">Heading 3</option>
+                    </select>
+                  </div>
+
+                  <div class="toolbar-separator"></div>
+
+                  <div class="toolbar-btn-group">
+                    <button type="button" class="t-btn" title="Bold (Ctrl+B)" onclick="execVisualCmd('bold')"><strong>B</strong></button>
+                    <button type="button" class="t-btn" title="Italic (Ctrl+I)" onclick="execVisualCmd('italic')"><em>I</em></button>
+                    <button type="button" class="t-btn" title="Underline (Ctrl+U)" onclick="execVisualCmd('underline')"><u>U</u></button>
+                  </div>
+
+                  <div class="toolbar-separator"></div>
+
+                  <div class="toolbar-btn-group">
+                    <button type="button" class="t-btn" title="Align Left" onclick="execVisualCmd('justifyLeft')">⫷</button>
+                    <button type="button" class="t-btn" title="Align Center" onclick="execVisualCmd('justifyCenter')">☰</button>
+                    <button type="button" class="t-btn" title="Align Right" onclick="execVisualCmd('justifyRight')">⫸</button>
+                  </div>
+
+                  <div class="toolbar-separator"></div>
+
+                  <div class="toolbar-btn-group">
+                    <button type="button" class="t-btn" title="Bullet List" onclick="execVisualCmd('insertUnorderedList')">• List</button>
+                    <button type="button" class="t-btn" title="Numbered List" onclick="execVisualCmd('insertOrderedList')">1. List</button>
+                  </div>
+
+                  <div class="toolbar-separator"></div>
+
+                  <div class="toolbar-btn-group">
+                    <button type="button" class="t-btn t-btn-cta" title="Insert Action Button" onclick="insertCtaButtonPrompt()">
+                      🔘 CTA Button
+                    </button>
+                    <button type="button" class="t-btn" title="Insert Link" onclick="insertLinkPrompt()">🔗 Link</button>
+                    <button type="button" class="t-btn" title="Insert Divider Line" onclick="execVisualCmd('insertHorizontalRule')">➖</button>
+                    <button type="button" class="t-btn" title="Clear Formatting" onclick="execVisualCmd('removeFormat')">🧹</button>
+                  </div>
+                </div>
+
+                <!-- Visual Contenteditable Canvas -->
+                <div class="visual-editor-canvas" id="tpl-visual-editor" contenteditable="true" spellcheck="true"></div>
+              </div>
+
+              <!-- Raw HTML Code Editor (Hidden by default) -->
+              <div id="code-editor-container" style="display: none;">
+                <textarea class="code-editor-box" id="tpl-input-html" placeholder="Enter responsive HTML email template..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Live Preview Pane -->
+          <div class="preview-pane">
+            <div class="preview-toolbar">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Preview As:</span>
+                <select class="form-select" id="preview-sample-select"
+                  style="padding: 4px 8px; font-size: 12px; width: 170px;">
+                  <option value="0">Rahul Sharma (TechCorp)</option>
+                  <option value="1">Priya Patel (Nexus Systems)</option>
+                  <option value="2">Amit Verma (Alpha Logistics)</option>
+                </select>
+              </div>
+
+              <div class="preview-device-toggle">
+                <button class="device-btn active" id="btn-preview-desktop" onclick="setPreviewDevice('desktop')">🖥
+                  Desktop</button>
+                <button class="device-btn" id="btn-preview-mobile" onclick="setPreviewDevice('mobile')">📱
+                  Mobile</button>
+              </div>
+            </div>
+
+            <div class="preview-envelope">
+              <div class="envelope-row">
+                <span class="envelope-label">To:</span>
+                <span class="envelope-val" id="preview-envelope-to">Rahul Sharma &lt;rahul.sharma@example.com&gt;</span>
+              </div>
+              <div class="envelope-row">
+                <span class="envelope-label">Subject:</span>
+                <span class="envelope-val" id="preview-envelope-subject">(Subject preview)</span>
+              </div>
+            </div>
+
+            <div class="preview-iframe-wrapper" id="preview-frame-wrapper">
+              <iframe class="preview-iframe" id="template-preview-frame"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-template-editor')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTemplateFromStudio()">Save Template</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CAMPAIGN LAUNCHER WIZARD -->
+  <div class="modal-backdrop" id="modal-campaign-wizard">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Launch Mass Personalized Campaign</h3>
+        <button class="btn-icon" onclick="closeModal('modal-campaign-wizard')">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Wizard Step Indicators -->
+        <div class="wizard-steps">
+          <div class="wizard-step active" id="wizard-step-indicator-1" onclick="setWizardStep(1)">
+            <div class="wizard-circle">1</div>
+            <span class="wizard-label">Sender</span>
+          </div>
+          <div class="wizard-step" id="wizard-step-indicator-2" onclick="setWizardStep(2)">
+            <div class="wizard-circle">2</div>
+            <span class="wizard-label">Audience & Template</span>
+          </div>
+          <div class="wizard-step" id="wizard-step-indicator-3" onclick="setWizardStep(3)">
+            <div class="wizard-circle">3</div>
+            <span class="wizard-label">Preview & Launch</span>
+          </div>
+        </div>
+
+        <!-- Step 1 Pane -->
+        <div id="wizard-step-pane-1">
+          <div class="form-group">
+            <label class="form-label">Campaign Name:</label>
+            <input type="text" class="form-input" id="wizard-campaign-name"
+              placeholder="e.g. September Product Announcement" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sender Name:</label>
+            <input type="text" class="form-input" id="wizard-from-name" placeholder="Alpever AI" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">From Email Address:</label>
+            <input type="email" class="form-input" id="wizard-from-email" placeholder="onboarding@resend.dev" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Reply-To Email (Optional):</label>
+            <input type="email" class="form-input" id="wizard-reply-to" placeholder="support@alpever.com" />
+          </div>
+          <div style="text-align: right; margin-top: 20px;">
+            <button class="btn btn-primary" onclick="setWizardStep(2)">Next: Choose Audience &rarr;</button>
+          </div>
+        </div>
+
+        <!-- Step 2 Pane -->
+        <div id="wizard-step-pane-2" style="display: none;">
+          <div class="form-group">
+            <label class="form-label">Select Target Audience List:</label>
+            <select class="form-select" id="wizard-list-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Select Dynamic Email Template:</label>
+            <select class="form-select" id="wizard-template-select"></select>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 24px;">
+            <button class="btn btn-secondary" onclick="setWizardStep(1)">&larr; Back</button>
+            <button class="btn btn-primary" onclick="setWizardStep(3)">Next: Review & Test &rarr;</button>
+          </div>
+        </div>
+
+        <!-- Step 3 Pane -->
+        <div id="wizard-step-pane-3" style="display: none;">
+          <div class="card" style="background: var(--bg-tertiary); margin-bottom: 20px; padding: 16px;">
+            <h4 style="font-size: 14px; margin-bottom: 8px; color: var(--accent-primary);">Campaign Summary:</h4>
+            <div style="font-size: 13px; line-height: 1.8;">
+              <div><strong>Name:</strong> <span id="confirm-camp-name"></span></div>
+              <div><strong>Audience:</strong> <span id="confirm-camp-list"></span></div>
+              <div><strong>Template:</strong> <span id="confirm-camp-template"></span></div>
+              <div><strong>Sender:</strong> <span id="confirm-camp-sender"></span></div>
+            </div>
+          </div>
+
+          <!-- Send Test Email Box -->
+          <div class="card" style="margin-bottom: 24px; padding: 16px; border: 1px dashed var(--accent-primary);">
+            <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 6px;">Send 1 Test Email First:</h4>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+              Verify that the email arrives in your inbox looking clean and personalized before firing the mass
+              campaign.
+            </p>
+            <div style="display: flex; gap: 8px;">
+              <input type="email" class="form-input" id="wizard-test-email"
+                placeholder="Enter your email to receive sample" />
+              <button class="btn btn-secondary" id="btn-send-test-email" onclick="sendTestEmailFromWizard()"
+                style="white-space: nowrap;">
+                Send Test
+              </button>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between;">
+            <button class="btn btn-secondary" onclick="setWizardStep(2)">&larr; Back</button>
+            <button class="btn btn-primary" id="btn-confirm-launch" onclick="confirmAndLaunchCampaign()">
+              🚀 Launch Mass Campaign Now
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CAMPAIGN LIVE MONITOR -->
+  <div class="modal-backdrop" id="modal-campaign-monitor">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title" id="monitor-modal-title">Live Delivery Monitor</h3>
+        <button class="btn-icon" onclick="closeModal('modal-campaign-monitor')">✕</button>
+      </div>
+      <div class="modal-body" style="text-align: center; padding: 30px 24px;">
+        <span class="badge badge-info" id="monitor-status-badge" style="margin-bottom: 16px;">PROCESSING</span>
+
+        <div style="font-size: 38px; font-weight: 800; color: var(--text-main); margin-bottom: 10px;"
+          id="monitor-pct-text">
+          0%
+        </div>
+
+        <div class="progress-bar-wrap" style="height: 16px; margin-bottom: 20px;">
+          <div class="progress-bar-fill animated" id="monitor-progress-bar" style="width: 0%;"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px;">
+          <div class="card" style="padding: 12px;">
+            <div style="font-size: 20px; font-weight: 700; color: var(--color-success);" id="monitor-sent-count">0</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Sent Successfully</div>
+          </div>
+          <div class="card" style="padding: 12px;">
+            <div style="font-size: 20px; font-weight: 700; color: var(--color-danger);" id="monitor-failed-count">0
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">Failed / Bounced</div>
+          </div>
+          <div class="card" style="padding: 12px;">
+            <div style="font-size: 20px; font-weight: 700; color: var(--text-main);" id="monitor-total-count">0</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Total Recipients</div>
+          </div>
+        </div>
+
+        <p style="font-size: 13px; color: var(--text-dim);" id="monitor-eta">
+          Processing batches via Resend API rate limiter...
+        </p>
+
+        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 24px;">
+          <button class="btn btn-secondary btn-sm" onclick="pauseActiveCampaign()">⏸ Pause</button>
+          <button class="btn btn-secondary btn-sm" onclick="resumeActiveCampaign()">▶ Resume</button>
+          <button class="btn btn-danger btn-sm" onclick="cancelActiveCampaign()">⏹ Stop Campaign</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm" onclick="closeModal('modal-campaign-monitor'); navigateTo('history');">
+          View Detailed Logs &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/components/toasts.js?v=2"></script>
+  <script src="/js/components/modal.js?v=2"></script>
+  <script src="/js/api.js?v=2"></script>
+  <script src="/js/views/dashboard.js?v=2"></script>
+  <script src="/js/views/contacts.js?v=2"></script>
+  <script src="/js/views/templates.js?v=2"></script>
+  <script src="/js/views/campaign.js?v=2"></script>
+  <script src="/js/views/history.js?v=2"></script>
+  <script src="/js/app.js?v=2"></script>
+</body>
+
+</html>

@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* AlpEver Light Theme Palette (Matching AlpEver Admin) */
+  --bg-primary: #f4f6fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafbfd;
+  --bg-glass: rgba(255, 255, 255, 0.95);
+
+  --border-subtle: #e2e8f0;
+  --border-light: #cbd5e1;
+  --border-focus: #f97316;
+
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #94a3b8;
+
+  /* AlpEver Orange Brand Colors */
+  --brand-orange: #f97316;
+  --brand-orange-hover: #ea580c;
+  --brand-orange-light: #fff7ed;
+  --brand-orange-border: #fed7aa;
+
+  --accent-primary: #f97316;
+  --accent-primary-hover: #ea580c;
+  --accent-gradient: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  --accent-gradient-glow: 0 4px 14px rgba(249, 115, 22, 0.25);
+
+  /* Pastel Squircle Palette for Stat KPI Cards */
+  --stat-purple-bg: #f3e8ff;
+  --stat-purple-icon: #7c3aed;
+  --stat-pink-bg: #fce7f3;
+  --stat-pink-icon: #ec4899;
+  --stat-amber-bg: #fef3c7;
+  --stat-amber-icon: #f59e0b;
+  --stat-green-bg: #ecfdf5;
+  --stat-green-icon: #10b981;
+  --stat-blue-bg: #eff6ff;
+  --stat-blue-icon: #2563eb;
+
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-danger: #ef4444;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
+  --color-info: #2563eb;
+  --color-info-bg: #eff6ff;
+  --color-info-border: #bfdbfe;
+
+  /* Elevation & Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 18px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 10px 30px -4px rgba(0, 0, 0, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.03);
+  --shadow-glow: 0 0 24px rgba(249, 115, 22, 0.2);
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
