@@ -107,13 +107,27 @@ async function ensureMySqlServer() {
 
     if (fs.existsSync(mysqldBin) && fs.existsSync(dataDir)) {
       console.log('🔄 Spawning dedicated MySQL 8.0 daemon on port 3307...');
-      const proc = spawn(mysqldBin, ['--datadir=' + dataDir, '--port=3307', '--console'], {
+      const logPath = path.join(dataDir, 'mysql_3307.log');
+      const logFd = fs.openSync(logPath, 'a');
+      const proc = spawn(mysqldBin, [
+        '--datadir=' + dataDir,
+        '--port=3307',
+        '--mysqlx=0',
+        '--log-error=' + logPath
+      ], {
         detached: true,
-        stdio: 'ignore'
+        stdio: ['ignore', logFd, logFd],
+        windowsHide: true
       });
       proc.unref();
-      // wait 2 seconds for mysqld to bind
-      await new Promise(r => setTimeout(r, 2000));
+
+      // Poll until port is open (up to 6 seconds)
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 400));
+        if (await isPortOpen()) {
+          break;
+        }
+      }
     }
   }
 }

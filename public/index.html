@@ -235,6 +235,201 @@
           </div>
         </section>
 
+        <!-- 3.1 DYNAMIC TEMPLATE STUDIO FULL-PAGE VIEW -->
+        <section class="view-section" id="view-template-studio">
+          <!-- Studio Header Action Bar -->
+          <div class="studio-topbar">
+            <div class="studio-topbar-left">
+              <button class="studio-back-btn" onclick="closeTemplateStudio()">
+                <span>&larr;</span> Back to Templates
+              </button>
+              <div class="studio-v-sep"></div>
+              <div class="studio-breadcrumb">
+                <span class="studio-crumb-parent">Templates</span>
+                <span class="studio-crumb-slash">/</span>
+                <span class="studio-crumb-current" id="template-editor-title">Edit Template</span>
+                <span class="badge badge-orange" style="font-size: 11px; padding: 2px 8px; margin-left: 4px;">Live Studio</span>
+              </div>
+            </div>
+            <div class="studio-topbar-right">
+              <div class="studio-autosave-indicator">
+                <span class="sync-live-dot"></span>
+                <span>Real-time Live Sync</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="closeTemplateStudio()">Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick="saveTemplateFromStudio()">
+                <span>💾</span> Save Template
+              </button>
+            </div>
+          </div>
+
+          <!-- Studio Editor & Live Preview Grid -->
+          <div class="template-editor-grid">
+            <!-- Left Editor Pane -->
+            <div class="editor-pane">
+              <!-- Meta Card: Name & Subject with Variable Tags -->
+              <div class="studio-card studio-meta-card">
+                <div class="studio-meta-grid">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">
+                      <span>📝</span> Template Internal Name:
+                    </label>
+                    <input type="text" class="form-input" id="tpl-input-name" placeholder="e.g. VIP Product Invitation" />
+                  </div>
+
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">
+                      <span>✉️</span> Email Subject Line:
+                    </label>
+                    <input type="text" class="form-input" id="tpl-input-subject"
+                      placeholder="e.g. Quick question regarding {{company}} for {{name}}" />
+                  </div>
+                </div>
+
+                <!-- Variable Tags Toolbar -->
+                <div class="studio-variables-bar">
+                  <div class="studio-vars-header">
+                    <span class="studio-vars-title">⚡ Insert Dynamic Tags (Click to inject):</span>
+                    <span class="studio-vars-hint">Replaced with contact data in live preview</span>
+                  </div>
+                  <div class="tag-pills-container" id="tag-pills-wrap">
+                    <span class="tag-pill" onclick="insertVariableTag('{{name}}')">+ {{name}}</span>
+                    <span class="tag-pill" onclick="insertVariableTag('{{company}}')">+ {{company}}</span>
+                    <span class="tag-pill" onclick="insertVariableTag('{{email}}')">+ {{email}}</span>
+                    <span class="tag-pill" onclick="insertVariableTag('{{place}}')">+ {{place}}</span>
+                    <span class="tag-pill" onclick="insertVariableTag('{{role}}')">+ {{role}}</span>
+                    <span class="tag-pill" onclick="insertVariableTag('{{company | \'your company\'}}')">+ {{company | 'fallback'}}</span>
+                    <span class="tag-pill custom-tag-btn" onclick="promptCustomVariableTag()">+ Custom Tag...</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Main Canvas Card: Clean Document Workspace -->
+              <div class="studio-card studio-canvas-card">
+                <!-- Integrated Canvas Toolbar & Mode Switcher -->
+                <div class="studio-canvas-toolbar-row">
+                  <div class="toolbar-left-actions">
+                    <div class="toolbar-btn-group">
+                      <select class="form-select" id="t-font-style" onchange="applyBlockStyle(this.value)" style="padding: 3px 8px; font-size: 12px; width: 112px; height: 30px;">
+                        <option value="p">Paragraph</option>
+                        <option value="h1">Heading 1</option>
+                        <option value="h2">Heading 2</option>
+                        <option value="h3">Heading 3</option>
+                      </select>
+                    </div>
+
+                    <div class="toolbar-separator"></div>
+
+                    <div class="toolbar-btn-group">
+                      <button type="button" class="t-btn" title="Bold (Ctrl+B)" onclick="execVisualCmd('bold')"><strong>B</strong></button>
+                      <button type="button" class="t-btn" title="Italic (Ctrl+I)" onclick="execVisualCmd('italic')"><em>I</em></button>
+                      <button type="button" class="t-btn" title="Underline (Ctrl+U)" onclick="execVisualCmd('underline')"><u>U</u></button>
+                    </div>
+
+                    <div class="toolbar-separator"></div>
+
+                    <div class="toolbar-btn-group">
+                      <button type="button" class="t-btn" title="Align Left" onclick="execVisualCmd('justifyLeft')">⫷</button>
+                      <button type="button" class="t-btn" title="Align Center" onclick="execVisualCmd('justifyCenter')">☰</button>
+                      <button type="button" class="t-btn" title="Align Right" onclick="execVisualCmd('justifyRight')">⫸</button>
+                    </div>
+
+                    <div class="toolbar-separator"></div>
+
+                    <div class="toolbar-btn-group">
+                      <button type="button" class="t-btn" title="Bullet List" onclick="execVisualCmd('insertUnorderedList')">• List</button>
+                      <button type="button" class="t-btn" title="Numbered List" onclick="execVisualCmd('insertOrderedList')">1. List</button>
+                    </div>
+
+                    <div class="toolbar-separator"></div>
+
+                    <div class="toolbar-btn-group">
+                      <button type="button" class="t-btn t-btn-cta" title="Insert Action Button" onclick="insertCtaButtonPrompt()">
+                        🔘 CTA Button
+                      </button>
+                      <button type="button" class="t-btn" title="Insert Link" onclick="insertLinkPrompt()">🔗 Link</button>
+                      <button type="button" class="t-btn" title="Insert Divider Line" onclick="execVisualCmd('insertHorizontalRule')">➖</button>
+                      <button type="button" class="t-btn" title="Clear Formatting" onclick="execVisualCmd('removeFormat')">🧹</button>
+                    </div>
+                  </div>
+
+                  <!-- Right Mode Tabs -->
+                  <div class="editor-tabs-group">
+                    <button type="button" class="editor-tab-btn active" id="btn-tab-visual" onclick="switchEditorMode('visual')">
+                      ✏️ Visual Editor
+                    </button>
+                    <button type="button" class="editor-tab-btn" id="btn-tab-code" onclick="switchEditorMode('code')">
+                      💻 HTML Code
+                    </button>
+                  </div>
+                </div>
+
+                <div style="display: none;" id="editor-mode-label"></div>
+
+                <!-- Visual Editor Container -->
+                <div id="visual-editor-container" class="studio-canvas-viewport">
+                  <!-- Visual Contenteditable Canvas (Clean Document Sheet) -->
+                  <div class="visual-editor-canvas" id="tpl-visual-editor" contenteditable="true" spellcheck="true"></div>
+                </div>
+
+                <!-- Raw HTML Code Editor -->
+                <div id="code-editor-container" style="display: none;" class="studio-canvas-viewport">
+                  <textarea class="code-editor-box" id="tpl-input-html" placeholder="Enter responsive HTML email template..."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Live Preview Pane (Client Window Simulation) -->
+            <div class="preview-pane">
+              <!-- Top Preview Header & Device Switcher -->
+              <div class="preview-client-header">
+                <div class="preview-sample-select-wrap">
+                  <span class="preview-sample-label">Preview Recipient:</span>
+                  <select class="form-select" id="preview-sample-select"
+                    style="padding: 4px 8px; font-size: 12px; width: 180px;">
+                    <option value="0">Rahul Sharma (TechCorp)</option>
+                    <option value="1">Priya Patel (Nexus Systems)</option>
+                    <option value="2">Amit Verma (Alpha Logistics)</option>
+                  </select>
+                </div>
+
+                <div class="preview-device-toggle">
+                  <button class="device-btn active" id="btn-preview-desktop" onclick="setPreviewDevice('desktop')">🖥 Desktop</button>
+                  <button class="device-btn" id="btn-preview-mobile" onclick="setPreviewDevice('mobile')">📱 Mobile</button>
+                </div>
+              </div>
+
+              <!-- Native Client Simulation Window -->
+              <div class="preview-client-window">
+                <div class="window-chrome-bar">
+                  <div class="window-traffic-lights">
+                    <span class="dot-red"></span>
+                    <span class="dot-yellow"></span>
+                    <span class="dot-green"></span>
+                  </div>
+                  <span class="window-chrome-title">Email Client Simulation (Resend Dispatch)</span>
+                  <span class="window-chrome-badge">Live Interpolation</span>
+                </div>
+
+                <div class="preview-envelope">
+                  <div class="preview-avatar-circle" id="preview-avatar">RS</div>
+                  <div class="preview-envelope-details">
+                    <div class="envelope-top-line">
+                      <span class="envelope-recipient-text" id="preview-envelope-to">Rahul Sharma &lt;rahul.sharma@example.com&gt;</span>
+                      <span class="envelope-timestamp">Just now</span>
+                    </div>
+                    <div class="envelope-subject-text" id="preview-envelope-subject">(Subject preview)</div>
+                  </div>
+                </div>
+
+                <div class="preview-iframe-wrapper" id="preview-frame-wrapper">
+                  <iframe class="preview-iframe" id="template-preview-frame"></iframe>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- 4. MASS CAMPAIGNS VIEW -->
         <section class="view-section" id="view-campaigns">
           <div class="card">
@@ -366,165 +561,9 @@
     </div>
   </div>
 
-  <!-- MODAL: DYNAMIC TEMPLATE STUDIO -->
-  <div class="modal-backdrop" id="modal-template-editor">
-    <div class="modal-dialog modal-lg" style="max-width: 1240px; width: 95vw;">
-      <div class="modal-header">
-        <h3 class="modal-title" id="template-editor-title">Dynamic Template Studio</h3>
-        <button class="btn-icon" onclick="closeModal('modal-template-editor')">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="template-editor-grid">
-          <!-- Left Editor Pane -->
-          <div class="editor-pane">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
-              <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Template Name:</label>
-                <input type="text" class="form-input" id="tpl-input-name" placeholder="e.g. VIP Product Invitation" />
-              </div>
-
-              <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Email Subject:</label>
-                <input type="text" class="form-input" id="tpl-input-subject"
-                  placeholder="e.g. Quick question for {{name}} at {{company}}" />
-              </div>
-            </div>
-
-            <!-- Variable Tags Toolbar -->
-            <div>
-              <label class="form-label" style="margin-bottom: 6px;">Click to inject Dynamic Variable:</label>
-              <div class="tag-pills-container" id="tag-pills-wrap">
-                <span class="tag-pill" onclick="insertVariableTag('{{name}}')">+ {{name}}</span>
-                <span class="tag-pill" onclick="insertVariableTag('{{company}}')">+ {{company}}</span>
-                <span class="tag-pill" onclick="insertVariableTag('{{email}}')">+ {{email}}</span>
-                <span class="tag-pill" onclick="insertVariableTag('{{place}}')">+ {{place}}</span>
-                <span class="tag-pill" onclick="insertVariableTag('{{role}}')">+ {{role}}</span>
-                <span class="tag-pill" onclick="insertVariableTag('{{company | \'your company\'}}')">+ {{company | 'fallback'}}</span>
-                <span class="tag-pill" style="border-style: dashed; background: #ffffff; color: var(--brand-orange);" onclick="promptCustomVariableTag()">+ Custom Tag...</span>
-              </div>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 0;">
-              <!-- Visual vs HTML Code Mode Switcher -->
-              <div class="editor-mode-tabs">
-                <label class="form-label" style="margin-bottom: 0;" id="editor-mode-label">Email Content (Visual Mode):</label>
-                <div class="editor-tabs-group">
-                  <button type="button" class="editor-tab-btn active" id="btn-tab-visual" onclick="switchEditorMode('visual')">
-                    ✏️ Visual Editor
-                  </button>
-                  <button type="button" class="editor-tab-btn" id="btn-tab-code" onclick="switchEditorMode('code')">
-                    💻 HTML Code
-                  </button>
-                </div>
-              </div>
-
-              <!-- Visual Editor Container (Default for non-coders) -->
-              <div id="visual-editor-container">
-                <!-- Formatting Toolbar -->
-                <div class="visual-toolbar">
-                  <div class="toolbar-btn-group">
-                    <select class="form-select" id="t-font-style" onchange="applyBlockStyle(this.value)" style="padding: 3px 8px; font-size: 12px; width: 110px; height: 28px;">
-                      <option value="p">Paragraph</option>
-                      <option value="h1">Heading 1</option>
-                      <option value="h2">Heading 2</option>
-                      <option value="h3">Heading 3</option>
-                    </select>
-                  </div>
-
-                  <div class="toolbar-separator"></div>
-
-                  <div class="toolbar-btn-group">
-                    <button type="button" class="t-btn" title="Bold (Ctrl+B)" onclick="execVisualCmd('bold')"><strong>B</strong></button>
-                    <button type="button" class="t-btn" title="Italic (Ctrl+I)" onclick="execVisualCmd('italic')"><em>I</em></button>
-                    <button type="button" class="t-btn" title="Underline (Ctrl+U)" onclick="execVisualCmd('underline')"><u>U</u></button>
-                  </div>
-
-                  <div class="toolbar-separator"></div>
-
-                  <div class="toolbar-btn-group">
-                    <button type="button" class="t-btn" title="Align Left" onclick="execVisualCmd('justifyLeft')">⫷</button>
-                    <button type="button" class="t-btn" title="Align Center" onclick="execVisualCmd('justifyCenter')">☰</button>
-                    <button type="button" class="t-btn" title="Align Right" onclick="execVisualCmd('justifyRight')">⫸</button>
-                  </div>
-
-                  <div class="toolbar-separator"></div>
-
-                  <div class="toolbar-btn-group">
-                    <button type="button" class="t-btn" title="Bullet List" onclick="execVisualCmd('insertUnorderedList')">• List</button>
-                    <button type="button" class="t-btn" title="Numbered List" onclick="execVisualCmd('insertOrderedList')">1. List</button>
-                  </div>
-
-                  <div class="toolbar-separator"></div>
-
-                  <div class="toolbar-btn-group">
-                    <button type="button" class="t-btn t-btn-cta" title="Insert Action Button" onclick="insertCtaButtonPrompt()">
-                      🔘 CTA Button
-                    </button>
-                    <button type="button" class="t-btn" title="Insert Link" onclick="insertLinkPrompt()">🔗 Link</button>
-                    <button type="button" class="t-btn" title="Insert Divider Line" onclick="execVisualCmd('insertHorizontalRule')">➖</button>
-                    <button type="button" class="t-btn" title="Clear Formatting" onclick="execVisualCmd('removeFormat')">🧹</button>
-                  </div>
-                </div>
-
-                <!-- Visual Contenteditable Canvas -->
-                <div class="visual-editor-canvas" id="tpl-visual-editor" contenteditable="true" spellcheck="true"></div>
-              </div>
-
-              <!-- Raw HTML Code Editor (Hidden by default) -->
-              <div id="code-editor-container" style="display: none;">
-                <textarea class="code-editor-box" id="tpl-input-html" placeholder="Enter responsive HTML email template..."></textarea>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right Live Preview Pane -->
-          <div class="preview-pane">
-            <div class="preview-toolbar">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Preview As:</span>
-                <select class="form-select" id="preview-sample-select"
-                  style="padding: 4px 8px; font-size: 12px; width: 170px;">
-                  <option value="0">Rahul Sharma (TechCorp)</option>
-                  <option value="1">Priya Patel (Nexus Systems)</option>
-                  <option value="2">Amit Verma (Alpha Logistics)</option>
-                </select>
-              </div>
-
-              <div class="preview-device-toggle">
-                <button class="device-btn active" id="btn-preview-desktop" onclick="setPreviewDevice('desktop')">🖥
-                  Desktop</button>
-                <button class="device-btn" id="btn-preview-mobile" onclick="setPreviewDevice('mobile')">📱
-                  Mobile</button>
-              </div>
-            </div>
-
-            <div class="preview-envelope">
-              <div class="envelope-row">
-                <span class="envelope-label">To:</span>
-                <span class="envelope-val" id="preview-envelope-to">Rahul Sharma &lt;rahul.sharma@example.com&gt;</span>
-              </div>
-              <div class="envelope-row">
-                <span class="envelope-label">Subject:</span>
-                <span class="envelope-val" id="preview-envelope-subject">(Subject preview)</span>
-              </div>
-            </div>
-
-            <div class="preview-iframe-wrapper" id="preview-frame-wrapper">
-              <iframe class="preview-iframe" id="template-preview-frame"></iframe>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('modal-template-editor')">Cancel</button>
-        <button class="btn btn-primary" onclick="saveTemplateFromStudio()">Save Template</button>
-      </div>
-    </div>
-  </div>
-
   <!-- MODAL: CAMPAIGN LAUNCHER WIZARD -->
   <div class="modal-backdrop" id="modal-campaign-wizard">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-header">
         <h3 class="modal-title">Launch Mass Personalized Campaign</h3>
         <button class="btn-icon" onclick="closeModal('modal-campaign-wizard')">✕</button>
@@ -534,11 +573,11 @@
         <div class="wizard-steps">
           <div class="wizard-step active" id="wizard-step-indicator-1" onclick="setWizardStep(1)">
             <div class="wizard-circle">1</div>
-            <span class="wizard-label">Sender</span>
+            <span class="wizard-label">Sender & Details</span>
           </div>
           <div class="wizard-step" id="wizard-step-indicator-2" onclick="setWizardStep(2)">
             <div class="wizard-circle">2</div>
-            <span class="wizard-label">Audience & Template</span>
+            <span class="wizard-label">Audience & Mapping</span>
           </div>
           <div class="wizard-step" id="wizard-step-indicator-3" onclick="setWizardStep(3)">
             <div class="wizard-circle">3</div>
@@ -551,63 +590,163 @@
           <div class="form-group">
             <label class="form-label">Campaign Name:</label>
             <input type="text" class="form-input" id="wizard-campaign-name"
-              placeholder="e.g. September Product Announcement" />
+              placeholder="e.g. Product Announcement - Q3 VIP Outreach" />
           </div>
-          <div class="form-group">
-            <label class="form-label">Sender Name:</label>
-            <input type="text" class="form-input" id="wizard-from-name" placeholder="Alpever AI" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">From Email Address:</label>
-            <input type="email" class="form-input" id="wizard-from-email" placeholder="onboarding@resend.dev" />
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label class="form-label">Sender Name:</label>
+              <input type="text" class="form-input" id="wizard-from-name" placeholder="Alpever AI" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">From Email Address:</label>
+              <input type="email" class="form-input" id="wizard-from-email" placeholder="notifications@alpever.com" />
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Reply-To Email (Optional):</label>
-            <input type="email" class="form-input" id="wizard-reply-to" placeholder="support@alpever.com" />
+            <input type="email" class="form-input" id="wizard-reply-to" placeholder="contact@alpever.com" />
           </div>
-          <div style="text-align: right; margin-top: 20px;">
-            <button class="btn btn-primary" onclick="setWizardStep(2)">Next: Choose Audience &rarr;</button>
+          <div style="text-align: right; margin-top: 24px;">
+            <button class="btn btn-primary" onclick="setWizardStep(2)">Next: Audience & Mapping &rarr;</button>
           </div>
         </div>
 
         <!-- Step 2 Pane -->
         <div id="wizard-step-pane-2" style="display: none;">
+          <!-- Audience Source Selector -->
           <div class="form-group">
-            <label class="form-label">Select Target Audience List:</label>
-            <select class="form-select" id="wizard-list-select"></select>
+            <label class="form-label">Choose Audience Data Source:</label>
+            <div class="source-toggle">
+              <button type="button" class="source-toggle-btn active" id="btn-src-upload" onclick="switchAudienceSource('upload')">
+                <span>📤</span> Upload Excel / CSV File
+              </button>
+              <button type="button" class="source-toggle-btn" id="btn-src-existing" onclick="switchAudienceSource('existing')">
+                <span>📋</span> Choose Saved Audience List
+              </button>
+            </div>
           </div>
-          <div class="form-group">
+
+          <!-- Upload Container -->
+          <div id="wizard-upload-container">
+            <div class="wizard-dropzone" id="wizard-dropzone">
+              <div class="wizard-dropzone-icon">📊</div>
+              <div class="wizard-dropzone-title">Click or Drag & Drop Excel / CSV here</div>
+              <div class="wizard-dropzone-subtitle">Supports .xlsx, .xls, and .csv files with any custom columns</div>
+              <input type="file" id="wizard-file-input" accept=".xlsx,.xls,.csv" style="display: none;" />
+            </div>
+
+            <!-- File Loaded Badge -->
+            <div class="file-loaded-card" id="wizard-file-loaded" style="display: none;">
+              <div class="file-loaded-info">
+                <div class="file-loaded-icon">✅</div>
+                <div>
+                  <div style="font-weight: 700; font-size: 14px; color: #166534;" id="wizard-loaded-filename">data.xlsx</div>
+                  <div style="font-size: 12px; color: #15803d;" id="wizard-loaded-rowcount">0 contacts detected</div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="triggerWizardFileInput()">Change File</button>
+            </div>
+          </div>
+
+          <!-- Existing List Container -->
+          <div id="wizard-existing-container" style="display: none;">
+            <div class="form-group">
+              <label class="form-label">Select Saved Audience List:</label>
+              <select class="form-select" id="wizard-list-select"></select>
+            </div>
+          </div>
+
+          <!-- Dynamic Template Selector -->
+          <div class="form-group" style="margin-top: 18px;">
             <label class="form-label">Select Dynamic Email Template:</label>
             <select class="form-select" id="wizard-template-select"></select>
+            <div id="wizard-template-info-box" style="margin-top: 8px; font-size: 12px; color: var(--text-muted); display: none;">
+              <strong>Template Subject:</strong> <span id="wizard-selected-tpl-subject">—</span>
+            </div>
           </div>
+
+          <!-- Smart Column Mapping Section -->
+          <div class="mapping-section" id="wizard-mapping-section" style="display: none;">
+            <div class="mapping-header">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <h4 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+                    <span>🔗</span> Smart Column Mapping
+                  </h4>
+                  <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
+                    Auto-matched based on your spreadsheet headers. Review or adjust mappings below:
+                  </p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="autoMatchCurrentTemplateAndHeaders()">
+                  ⚡ Re-Auto Match
+                </button>
+              </div>
+            </div>
+
+            <!-- Mapping Grid -->
+            <div id="wizard-mapping-rows">
+              <!-- Dynamically populated by campaign.js -->
+            </div>
+
+            <!-- Live Sample Contact Email Preview -->
+            <div class="wizard-preview-card" id="wizard-preview-card">
+              <div class="preview-switcher">
+                <span style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                  <span>👁️</span> Live Contact Email Preview:
+                </span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="changeWizardPreviewContact(-1)">&larr; Prev</button>
+                  <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);" id="wizard-preview-contact-counter">
+                    Contact 1 of 1
+                  </span>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="changeWizardPreviewContact(1)">Next &rarr;</button>
+                </div>
+              </div>
+
+              <!-- Rendered Subject -->
+              <div style="background: #ffffff; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 14px; margin-bottom: 10px; font-size: 13px;">
+                <strong>Subject:</strong> <span id="wizard-preview-subject" style="color: var(--text-main);">—</span>
+              </div>
+
+              <!-- Rendered Body -->
+              <div class="preview-rendered-body" id="wizard-preview-body">
+                <!-- Live rendered HTML -->
+              </div>
+            </div>
+          </div>
+
           <div style="display: flex; justify-content: space-between; margin-top: 24px;">
             <button class="btn btn-secondary" onclick="setWizardStep(1)">&larr; Back</button>
-            <button class="btn btn-primary" onclick="setWizardStep(3)">Next: Review & Test &rarr;</button>
+            <button class="btn btn-primary" id="btn-wizard-to-step3" onclick="validateStep2AndProceed()">Next: Review & Test &rarr;</button>
           </div>
         </div>
 
         <!-- Step 3 Pane -->
         <div id="wizard-step-pane-3" style="display: none;">
-          <div class="card" style="background: var(--bg-tertiary); margin-bottom: 20px; padding: 16px;">
-            <h4 style="font-size: 14px; margin-bottom: 8px; color: var(--accent-primary);">Campaign Summary:</h4>
-            <div style="font-size: 13px; line-height: 1.8;">
-              <div><strong>Name:</strong> <span id="confirm-camp-name"></span></div>
+          <div class="card" style="background: var(--bg-tertiary); margin-bottom: 20px; padding: 18px;">
+            <h4 style="font-size: 14px; margin-bottom: 10px; color: var(--brand-orange-hover); font-weight: 700;">
+              📋 Campaign Summary & Ready to Send:
+            </h4>
+            <div style="font-size: 13px; line-height: 2;">
+              <div><strong>Campaign:</strong> <span id="confirm-camp-name"></span></div>
               <div><strong>Audience:</strong> <span id="confirm-camp-list"></span></div>
               <div><strong>Template:</strong> <span id="confirm-camp-template"></span></div>
               <div><strong>Sender:</strong> <span id="confirm-camp-sender"></span></div>
+              <div><strong>Total Recipients:</strong> <span class="badge badge-info" id="confirm-camp-count">0</span></div>
             </div>
           </div>
 
           <!-- Send Test Email Box -->
-          <div class="card" style="margin-bottom: 24px; padding: 16px; border: 1px dashed var(--accent-primary);">
-            <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 6px;">Send 1 Test Email First:</h4>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
-              Verify that the email arrives in your inbox looking clean and personalized before firing the mass
-              campaign.
+          <div class="card" style="margin-bottom: 24px; padding: 16px; border: 1px dashed var(--brand-orange-border); background: #fffaf5;">
+            <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--brand-orange-hover);">
+              ✉️ Send 1 Live Test Email First:
+            </h4>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+              Receive a personalized sample in your actual inbox using row 1's data before mass sending.
             </p>
             <div style="display: flex; gap: 8px;">
               <input type="email" class="form-input" id="wizard-test-email"
-                placeholder="Enter your email to receive sample" />
+                placeholder="Enter your personal email (e.g. you@company.com)" />
               <button class="btn btn-secondary" id="btn-send-test-email" onclick="sendTestEmailFromWizard()"
                 style="white-space: nowrap;">
                 Send Test
@@ -617,7 +756,7 @@
 
           <div style="display: flex; justify-content: space-between;">
             <button class="btn btn-secondary" onclick="setWizardStep(2)">&larr; Back</button>
-            <button class="btn btn-primary" id="btn-confirm-launch" onclick="confirmAndLaunchCampaign()">
+            <button class="btn btn-primary" id="btn-confirm-launch" onclick="confirmAndLaunchCampaign()" style="font-size: 14px; padding: 10px 24px;">
               🚀 Launch Mass Campaign Now
             </button>
           </div>

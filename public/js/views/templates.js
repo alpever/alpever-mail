@@ -70,7 +70,10 @@ async function loadTemplatesGrid() {
 
 function openTemplateEditor(template = null) {
   editingTemplateId = template ? template.id : null;
-  document.getElementById('template-editor-title').textContent = template ? `Edit Template: ${template.name}` : 'Create Dynamic Template';
+  const titleEl = document.getElementById('template-editor-title');
+  if (titleEl) {
+    titleEl.textContent = template ? template.name : 'New Template';
+  }
 
   document.getElementById('tpl-input-name').value = template ? template.name : '';
   document.getElementById('tpl-input-subject').value = template ? template.subject : '';
@@ -87,8 +90,13 @@ function openTemplateEditor(template = null) {
   // Switch to Visual mode by default
   switchEditorMode('visual');
 
-  openModal('modal-template-editor');
+  navigateTo('template-studio');
+  setupLivePreviewListeners();
   updateLivePreview();
+}
+
+function closeTemplateStudio() {
+  navigateTo('templates');
 }
 
 async function editTemplate(id) {
@@ -242,6 +250,16 @@ function setupLivePreviewListeners() {
     });
   }
 
+  const nameInput = document.getElementById('tpl-input-name');
+  if (nameInput) {
+    nameInput.addEventListener('input', () => {
+      const titleEl = document.getElementById('template-editor-title');
+      if (titleEl) {
+        titleEl.textContent = nameInput.value.trim() || 'Untitled Template';
+      }
+    });
+  }
+
   if (subjectInput) {
     ['input', 'keyup', 'change'].forEach(evt => {
       subjectInput.addEventListener(evt, updateLivePreview);
@@ -353,6 +371,11 @@ function updateLivePreview() {
   if (previewTo) {
     previewTo.textContent = `${sampleContact.name} <${sampleContact.email}>`;
   }
+  const previewAvatar = document.getElementById('preview-avatar');
+  if (previewAvatar && sampleContact && sampleContact.name) {
+    const initials = sampleContact.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    previewAvatar.textContent = initials;
+  }
 
   // Wrap in responsive clean email styling so plain text or visual HTML looks gorgeous
   const fullHtml = `
@@ -445,7 +468,7 @@ async function saveTemplateFromStudio() {
       showToast('Template created successfully!', 'success');
     }
 
-    closeModal('modal-template-editor');
+    closeTemplateStudio();
     await loadTemplatesGrid();
     if (window.loadDashboardView) window.loadDashboardView();
   } catch (err) {
@@ -493,6 +516,8 @@ function promptCustomVariableTag() {
 
 window.loadTemplatesView = loadTemplatesView;
 window.openTemplateEditor = openTemplateEditor;
+window.closeTemplateStudio = closeTemplateStudio;
+window.setupLivePreviewListeners = setupLivePreviewListeners;
 window.editTemplate = editTemplate;
 window.quickPreviewTemplate = quickPreviewTemplate;
 window.deleteTemplate = deleteTemplate;

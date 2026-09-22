@@ -3,3 +3,4 @@ node_modules
 scratch
 package-lock.json
 uploads/
+mysql_data/

@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { getPool } = require('../db/pool');
-const { parseUploadedFile, standardizeRows } = require('../services/fileParser');
+const { parseUploadedFile, parseRawFile, standardizeRows, autoMatchVariables } = require('../services/fileParser');
 
 // Configure multer for file uploads
 const uploadDir = path.join(__dirname, '../../uploads');
@@ -43,7 +43,50 @@ router.get('/lists', async (req, res) => {
   }
 });
 
-// POST /api/contacts/upload - Upload file (CSV, XLSX, XLS, JSON)
+// POST /api/contacts/parse-file - Parse file instantly for wizard preview without persisting
+router.post('/parse-file', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const filePath = req.file.path;
+  const originalName = req.file.originalname;
+
+  try {
+    const parsed = await parseRawFile(filePath, originalName);
+    fs.unlink(filePath, () => {});
+
+    if (!parsed.totalRows) {
+      return res.status(400).json({
+        error: 'The uploaded file appears to be empty. Please upload an Excel or CSV file with contact rows.'
+      });
+    }
+
+    res.json({
+      success: true,
+      fileName: originalName,
+      detectedHeaders: parsed.detectedHeaders,
+      totalRows: parsed.totalRows,
+      sampleRows: parsed.sampleRows,
+      suggestedMapping: parsed.suggestedMapping
+    });
+  } catch (err) {
+    fs.unlink(filePath, () => {});
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/contacts/auto-match - Auto-match Excel headers to template variables
+router.post('/auto-match', (req, res) => {
+  const { headers, templateVars } = req.body;
+  if (!Array.isArray(headers) || !Array.isArray(templateVars)) {
+    return res.status(400).json({ error: 'headers and templateVars arrays are required' });
+  }
+  const matched = autoMatchVariables(headers, templateVars);
+  res.json({ success: true, mapping: matched });
+});
+
+// POST /api/contacts/upload - Upload file with optional custom mapping
 router.post('/upload', upload.single('file'), async (req, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not connected' });
@@ -57,17 +100,25 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   const listName = req.body.listName || path.basename(originalName, path.extname(originalName)) || 'Uploaded Audience';
   const description = req.body.description || `Uploaded from ${originalName} on ${new Date().toLocaleDateString()}`;
 
+  let mapping = null;
+  if (req.body.mapping) {
+    try {
+      mapping = typeof req.body.mapping === 'string' ? JSON.parse(req.body.mapping) : req.body.mapping;
+    } catch (e) {
+      mapping = null;
+    }
+  }
+
   try {
-    const parsed = await parseUploadedFile(filePath, originalName);
+    const parsed = await parseUploadedFile(filePath, originalName, mapping);
 
     console.log(`[Upload Processed] File: ${originalName}, Detected Headers: [${parsed.detectedHeaders.join(', ')}], Contacts Found: ${parsed.contacts.length}, Invalid Rows: ${parsed.invalidRows.length}`);
 
     if (!parsed.contacts.length) {
-      // Remove temp file
       fs.unlink(filePath, () => {});
       const headerList = parsed.detectedHeaders.length ? `Headers detected: [${parsed.detectedHeaders.join(', ')}]. ` : '';
       return res.status(400).json({
-        error: `No valid contacts found in file. ${headerList}Please ensure the file has a column with valid email addresses.`,
+        error: `No valid contacts found in file. ${headerList}Please ensure the mapped column contains valid email addresses.`,
         detectedHeaders: parsed.detectedHeaders,
         invalidRows: parsed.invalidRows.slice(0, 5)
       });
@@ -209,6 +260,48 @@ router.get('/list/:id', async (req, res) => {
       limit,
       totalPages: Math.ceil(total / limit),
       contacts: formatted
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/contacts/list/:id/sample - Get sample contacts and detected headers for wizard mapping & preview
+router.get('/list/:id/sample', async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'Database not connected' });
+
+  try {
+    const [listRows] = await pool.query('SELECT * FROM contact_lists WHERE id = ?', [req.params.id]);
+    if (!listRows.length) return res.status(404).json({ error: 'Contact list not found' });
+
+    const [contacts] = await pool.query('SELECT * FROM contacts WHERE list_id = ? ORDER BY id ASC LIMIT 10', [req.params.id]);
+
+    const formatted = contacts.map(c => {
+      let custom = c.custom_fields;
+      if (typeof custom === 'string') {
+        try { custom = JSON.parse(custom); } catch (e) { custom = {}; }
+      }
+      return {
+        id: c.id,
+        email: c.email,
+        name: c.name || '',
+        company: c.company || '',
+        custom_fields: custom || {}
+      };
+    });
+
+    const headerSet = new Set(['Email', 'Name', 'Company']);
+    formatted.forEach(c => {
+      Object.keys(c.custom_fields || {}).forEach(k => headerSet.add(k));
+    });
+
+    res.json({
+      success: true,
+      list: listRows[0],
+      detectedHeaders: Array.from(headerSet),
+      sampleContacts: formatted,
+      totalRows: listRows[0].total_contacts
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

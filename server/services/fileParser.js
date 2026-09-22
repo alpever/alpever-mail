@@ -86,6 +86,16 @@ function standardizeRows(rows = [], customMapping = null) {
     return { contacts: [], invalidRows: [], detectedHeaders: [] };
   }
 
+  // Parse customMapping if passed as JSON string
+  let mappingObj = customMapping;
+  if (typeof customMapping === 'string') {
+    try {
+      mappingObj = JSON.parse(customMapping);
+    } catch (e) {
+      mappingObj = null;
+    }
+  }
+
   // Clean row keys (strip BOM from keys)
   const cleanedRows = rows.map(r => {
     const cleanRow = {};
@@ -96,7 +106,7 @@ function standardizeRows(rows = [], customMapping = null) {
   });
 
   const detectedHeaders = Object.keys(cleanedRows[0] || {});
-  const mapping = customMapping || identifyColumns(detectedHeaders, cleanedRows);
+  const mapping = mappingObj || identifyColumns(detectedHeaders, cleanedRows);
 
   const contacts = [];
   const invalidRows = [];
@@ -133,12 +143,26 @@ function standardizeRows(rows = [], customMapping = null) {
     const name = mapping.name ? cleanString(row[mapping.name]) : '';
     const company = mapping.company ? cleanString(row[mapping.company]) : '';
 
-    // Collect all other attributes as custom_fields
+    // Collect custom_fields
     const customFields = {};
+
+    // 1. If explicit customFields mappings were provided (e.g. { role: 'Designation', place: 'City' })
+    if (mapping.customFields && typeof mapping.customFields === 'object') {
+      for (const [targetVar, sourceHeader] of Object.entries(mapping.customFields)) {
+        if (sourceHeader && row[sourceHeader] !== undefined) {
+          const cleanVal = cleanString(row[sourceHeader]);
+          if (cleanVal !== '') {
+            customFields[targetVar] = cleanVal;
+          }
+        }
+      }
+    }
+
+    // 2. Also keep all remaining row columns in custom_fields so no data is lost
     for (const [key, val] of Object.entries(row)) {
       if (key !== mapping.email && key !== mapping.name && key !== mapping.company) {
         const cleanVal = cleanString(val);
-        if (cleanVal !== '') {
+        if (cleanVal !== '' && customFields[key.trim()] === undefined) {
           customFields[key.trim()] = cleanVal;
         }
       }
@@ -185,9 +209,153 @@ function detectDelimiter(filePath) {
 }
 
 /**
+ * Parse raw rows from file without standardizing or filtering out records
+ */
+async function parseRawFile(filePath, originalFilename) {
+  const ext = (originalFilename.split('.').pop() || '').toLowerCase();
+  let rows = [];
+
+  if (ext === 'csv' || ext === 'txt' || ext === 'tsv') {
+    const separator = ext === 'tsv' ? '\t' : detectDelimiter(filePath);
+    rows = await new Promise((resolve, reject) => {
+      const results = [];
+      fs.createReadStream(filePath)
+        .pipe(csv({
+          separator,
+          mapHeaders: ({ header }) => cleanString(header)
+        }))
+        .on('data', (data) => results.push(data))
+        .on('end', () => {
+          if (results.length > 0) return resolve(results);
+          try {
+            const workbook = xlsx.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const parsed = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+            resolve(parsed);
+          } catch (e) {
+            resolve([]);
+          }
+        })
+        .on('error', () => {
+          try {
+            const workbook = xlsx.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const parsed = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+            resolve(parsed);
+          } catch (e) {
+            resolve([]);
+          }
+        });
+    });
+  } else if (['xlsx', 'xls'].includes(ext)) {
+    const workbook = xlsx.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+  } else if (ext === 'json') {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    rows = Array.isArray(parsed) ? parsed : (parsed.contacts || parsed.data || []);
+  } else {
+    try {
+      const workbook = xlsx.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+    } catch (e) {
+      throw new Error(`Unsupported file type: .${ext}. Please upload .csv, .xlsx, .xls, or .json`);
+    }
+  }
+
+  // Clean row keys
+  const cleanedRows = rows.map(r => {
+    const cleanRow = {};
+    for (const [k, v] of Object.entries(r)) {
+      cleanRow[cleanString(k)] = cleanString(v);
+    }
+    return cleanRow;
+  });
+
+  const detectedHeaders = cleanedRows.length > 0 ? Object.keys(cleanedRows[0]) : [];
+  const suggestedMapping = identifyColumns(detectedHeaders, cleanedRows);
+
+  return {
+    detectedHeaders,
+    totalRows: cleanedRows.length,
+    sampleRows: cleanedRows.slice(0, 10),
+    rawRows: cleanedRows,
+    suggestedMapping
+  };
+}
+
+/**
+ * Smart matching of Excel headers to template variables
+ */
+function autoMatchVariables(headers = [], templateVars = []) {
+  const mapping = {};
+  const lowerHeaders = headers.map(h => ({
+    raw: h,
+    lower: h.toLowerCase().trim(),
+    clean: h.toLowerCase().replace(/[\s_-]+/g, '')
+  }));
+
+  const synonyms = {
+    email: ['email', 'e-mail', 'mail', 'contact_email', 'work_email', 'email_address', 'primary_email'],
+    name: ['name', 'fullname', 'full_name', 'customer_name', 'client_name', 'contact_name', 'first_name', 'firstname', 'fname', 'person', 'recipient'],
+    company: ['company', 'company_name', 'organization', 'org', 'business', 'employer', 'firm', 'agency', 'enterprise'],
+    place: ['place', 'city', 'location', 'state', 'town', 'address', 'country'],
+    city: ['city', 'place', 'location', 'town', 'state'],
+    role: ['role', 'designation', 'title', 'position', 'job_title', 'job', 'occupation'],
+    phone: ['phone', 'mobile', 'tel', 'cell', 'whatsapp', 'number', 'phone_number', 'contact_number'],
+    discount: ['discount', 'coupon', 'promo', 'offer', 'code', 'promo_code', 'voucher'],
+    website: ['website', 'site', 'url', 'link', 'domain']
+  };
+
+  for (const v of templateVars) {
+    const cleanVar = v.toLowerCase().trim();
+    const noUnderscore = cleanVar.replace(/[\s_-]+/g, '');
+    let matched = '';
+
+    // 1. Direct exact or clean match
+    for (const h of lowerHeaders) {
+      if (h.lower === cleanVar || h.clean === noUnderscore) {
+        matched = h.raw;
+        break;
+      }
+    }
+
+    // 2. Synonyms match
+    if (!matched && synonyms[cleanVar]) {
+      for (const syn of synonyms[cleanVar]) {
+        for (const h of lowerHeaders) {
+          if (h.lower === syn || h.clean === syn.replace(/[\s_-]+/g, '') || h.lower.includes(syn)) {
+            matched = h.raw;
+            break;
+          }
+        }
+        if (matched) break;
+      }
+    }
+
+    // 3. Substring match
+    if (!matched) {
+      for (const h of lowerHeaders) {
+        if (h.clean.includes(noUnderscore) || noUnderscore.includes(h.clean)) {
+          matched = h.raw;
+          break;
+        }
+      }
+    }
+
+    mapping[v] = matched;
+  }
+
+  return mapping;
+}
+
+/**
  * Parse file based on extension (CSV, XLSX, XLS, JSON)
  */
-async function parseUploadedFile(filePath, originalFilename) {
+async function parseUploadedFile(filePath, originalFilename, customMapping = null) {
   const ext = (originalFilename.split('.').pop() || '').toLowerCase();
 
   if (ext === 'csv' || ext === 'txt' || ext === 'tsv') {
@@ -202,28 +370,25 @@ async function parseUploadedFile(filePath, originalFilename) {
         }))
         .on('data', (data) => results.push(data))
         .on('end', () => {
-          // If csv-parser got rows, standardize them
           if (results.length > 0) {
-            resolve(standardizeRows(results));
+            resolve(standardizeRows(results, customMapping));
           } else {
-            // Fallback to xlsx library which natively parses any CSV/TSV
             try {
               const workbook = xlsx.readFile(filePath);
               const sheetName = workbook.SheetNames[0];
               const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
-              resolve(standardizeRows(rows));
+              resolve(standardizeRows(rows, customMapping));
             } catch (xlsxErr) {
               resolve({ contacts: [], invalidRows: [], detectedHeaders: [] });
             }
           }
         })
         .on('error', () => {
-          // Fallback to xlsx
           try {
             const workbook = xlsx.readFile(filePath);
             const sheetName = workbook.SheetNames[0];
             const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
-            resolve(standardizeRows(rows));
+            resolve(standardizeRows(rows, customMapping));
           } catch (xlsxErr) {
             reject(xlsxErr);
           }
@@ -234,19 +399,18 @@ async function parseUploadedFile(filePath, originalFilename) {
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const rows = xlsx.utils.sheet_to_json(sheet);
-    return standardizeRows(rows);
+    return standardizeRows(rows, customMapping);
   } else if (ext === 'json') {
     const raw = fs.readFileSync(filePath, 'utf8');
     const parsed = JSON.parse(raw);
     const rows = Array.isArray(parsed) ? parsed : (parsed.contacts || parsed.data || []);
-    return standardizeRows(rows);
+    return standardizeRows(rows, customMapping);
   } else {
-    // Try xlsx as universal fallback
     try {
       const workbook = xlsx.readFile(filePath);
       const sheetName = workbook.SheetNames[0];
       const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
-      return standardizeRows(rows);
+      return standardizeRows(rows, customMapping);
     } catch (e) {
       throw new Error(`Unsupported file type: .${ext}. Please upload .csv, .xlsx, .xls, or .json`);
     }
@@ -255,6 +419,8 @@ async function parseUploadedFile(filePath, originalFilename) {
 
 module.exports = {
   parseUploadedFile,
+  parseRawFile,
   standardizeRows,
-  identifyColumns
+  identifyColumns,
+  autoMatchVariables
 };

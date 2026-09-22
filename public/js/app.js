@@ -15,7 +15,8 @@ window.escapeHtml = escapeHtml;
 function navigateTo(viewName) {
   // Update sidebar active state
   document.querySelectorAll('.nav-item').forEach(item => {
-    item.classList.toggle('active', item.dataset.view === viewName);
+    const isTarget = item.dataset.view === viewName || (viewName === 'template-studio' && item.dataset.view === 'templates');
+    item.classList.toggle('active', isTarget);
   });
 
   // Switch visible section
@@ -28,11 +29,15 @@ function navigateTo(viewName) {
     targetSection.classList.add('active');
   }
 
+  // Toggle studio full-screen mode on body
+  document.body.classList.toggle('studio-mode-active', viewName === 'template-studio');
+
   // Update Page Title in Top Header
   const titles = {
     dashboard: 'Dashboard Overview',
     contacts: 'Audience & Contacts',
-    templates: 'Dynamic Template Studio',
+    templates: 'Dynamic Email Templates',
+    'template-studio': 'Dynamic Template Studio',
     campaigns: 'Mass Campaigns & Dispatch',
     history: 'Audit Logs & Delivery Reports'
   };
@@ -47,6 +52,10 @@ function navigateTo(viewName) {
   if (validView === 'templates' && window.loadTemplatesView) window.loadTemplatesView();
   if (validView === 'campaigns' && window.loadCampaignsView) window.loadCampaignsView();
   if (validView === 'history' && window.loadHistoryView) window.loadHistoryView();
+  if (validView === 'template-studio') {
+    if (window.setupLivePreviewListeners) window.setupLivePreviewListeners();
+    if (window.updateLivePreview) window.updateLivePreview();
+  }
 
   window.location.hash = validView;
 }

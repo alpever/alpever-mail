@@ -60,6 +60,35 @@ assert.strictEqual(standardized.contacts[0].email, 'alice@domain.com');
 assert.strictEqual(standardized.contacts[0].name, 'Alice Cooper');
 assert.strictEqual(standardized.contacts[0].company, 'Acme Corp');
 assert.strictEqual(standardized.contacts[0].custom_fields.Plan, 'Enterprise');
-console.log('  ✓ standardizeRows detected email, name, company and preserved custom fields');
+// 3. Custom Mapping & Auto-Match Tests
+console.log('\n3️⃣ Testing Explicit Custom Mapping & Auto-Matching...');
+const { autoMatchVariables } = require('../server/services/fileParser');
+
+const headers = ['Recipient Mail', 'Client Full Name', 'Organization', 'City Location', 'Job Title'];
+const autoMatched = autoMatchVariables(headers, ['email', 'name', 'company', 'place', 'role']);
+assert.strictEqual(autoMatched.email, 'Recipient Mail', 'Auto-match email synonym');
+assert.strictEqual(autoMatched.name, 'Client Full Name', 'Auto-match name synonym');
+assert.strictEqual(autoMatched.company, 'Organization', 'Auto-match company synonym');
+assert.strictEqual(autoMatched.place, 'City Location', 'Auto-match place synonym');
+assert.strictEqual(autoMatched.role, 'Job Title', 'Auto-match role synonym');
+console.log('  ✓ autoMatchVariables correctly mapped template tags to spreadsheet columns');
+
+// Test standardizeRows with customMapping
+const customMapped = standardizeRows(
+  [{ 'Recipient Mail': 'test@org.com', 'Client Full Name': 'Test User', 'Organization': 'Org Inc', 'City Location': 'Jaipur', 'Job Title': 'Director' }],
+  {
+    email: 'Recipient Mail',
+    name: 'Client Full Name',
+    company: 'Organization',
+    customFields: { place: 'City Location', role: 'Job Title' }
+  }
+);
+assert.strictEqual(customMapped.contacts.length, 1);
+assert.strictEqual(customMapped.contacts[0].email, 'test@org.com');
+assert.strictEqual(customMapped.contacts[0].name, 'Test User');
+assert.strictEqual(customMapped.contacts[0].company, 'Org Inc');
+assert.strictEqual(customMapped.contacts[0].custom_fields.place, 'Jaipur');
+assert.strictEqual(customMapped.contacts[0].custom_fields.role, 'Director');
+console.log('  ✓ standardizeRows correctly honored explicit customMapping');
 
 console.log('\n🎉 ALL UNIT TESTS PASSED SUCCESSFULLY! Everything is working properly.');

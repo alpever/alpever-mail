@@ -235,6 +235,21 @@
   margin: 0 auto;
 }
 
+/* Studio Mode Full-Bleed Clean Shell */
+body.studio-mode-active .top-header {
+  display: none !important;
+}
+
+body.studio-mode-active .content-body {
+  padding: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+
+body.studio-mode-active .main-wrapper {
+  background-color: #f8fafc;
+}
+
 /* View Sections */
 .view-section {
   display: none;
