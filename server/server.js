@@ -19,8 +19,9 @@ app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-// Static frontend
+// Static frontend & uploads
 app.use(express.static(path.join(__dirname, '../public')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Global API status / stats endpoint
 app.get('/api/stats', async (req, res) => {

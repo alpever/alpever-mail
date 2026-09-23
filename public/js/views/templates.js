@@ -15,6 +15,7 @@ const sampleCustomers = [
 async function loadTemplatesView() {
   await loadTemplatesGrid();
   setupLivePreviewListeners();
+  initImageResizerSystem();
 }
 
 async function loadTemplatesGrid() {
@@ -92,10 +93,12 @@ function openTemplateEditor(template = null) {
 
   navigateTo('template-studio');
   setupLivePreviewListeners();
+  initImageResizerSystem();
   updateLivePreview();
 }
 
 function closeTemplateStudio() {
+  if (typeof deselectImage === 'function') deselectImage();
   navigateTo('templates');
 }
 
@@ -127,6 +130,7 @@ async function deleteTemplate(id) {
  * Editor Mode Switcher: Visual WYSIWYG vs Raw HTML Code
  */
 function switchEditorMode(mode) {
+  if (typeof deselectImage === 'function') deselectImage();
   currentEditorMode = mode;
   const visualContainer = document.getElementById('visual-editor-container');
   const codeContainer = document.getElementById('code-editor-container');
@@ -162,14 +166,247 @@ function switchEditorMode(mode) {
 }
 
 /**
+ * Caret & Selection Persistence for Visual Editor
+ * Ensures images, CTA buttons, and tags insert EXACTLY where the user clicked!
+ */
+let savedVisualEditorRange = null;
+let lastClickedEditorBlock = null;
+let lastRecordedTarget = null;
+
+function updateCaretTracking(e) {
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  if (!visualEditor) return;
+
+  // 1. If clicked or interacted with a specific child inside visualEditor
+  if (e && e.target && visualEditor.contains(e.target) && e.target !== visualEditor) {
+    let el = e.target;
+    while (el && el.parentElement && el.parentElement !== visualEditor && el.parentElement.tagName !== 'DIV') {
+      el = el.parentElement;
+    }
+    lastRecordedTarget = el;
+    lastClickedEditorBlock = el;
+  } else if (e && e.target === visualEditor) {
+    // 2. Clicked in the blank area of visualEditor!
+    const children = Array.from(visualEditor.children).filter(c => 
+      !c.classList.contains('image-resizer-overlay') && c.tagName !== 'SCRIPT' && c.tagName !== 'STYLE'
+    );
+    
+    if (children.length > 0) {
+      if (e.clientY) {
+        let targetChild = children[children.length - 1]; // default to last child
+        for (let i = 0; i < children.length; i++) {
+          const rect = children[i].getBoundingClientRect();
+          if (e.clientY < rect.top) {
+            targetChild = i > 0 ? children[i - 1] : children[0];
+            break;
+          }
+        }
+        lastRecordedTarget = targetChild;
+        lastClickedEditorBlock = targetChild;
+      } else {
+        lastRecordedTarget = children[children.length - 1];
+        lastClickedEditorBlock = children[children.length - 1];
+      }
+    }
+  }
+
+  saveVisualEditorCaret();
+}
+
+function saveVisualEditorCaret() {
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && visualEditor) {
+    const range = sel.getRangeAt(0);
+    if (visualEditor.contains(range.commonAncestorContainer) || range.commonAncestorContainer === visualEditor) {
+      savedVisualEditorRange = range.cloneRange();
+      let node = range.startContainer;
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+      if (node && visualEditor.contains(node) && node !== visualEditor) {
+        lastClickedEditorBlock = node;
+        lastRecordedTarget = node;
+      }
+    }
+  }
+}
+
+function restoreVisualEditorCaret() {
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  if (!visualEditor) return false;
+
+  if (savedVisualEditorRange) {
+    try {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedVisualEditorRange);
+      return true;
+    } catch (e) {
+      console.warn('Could not restore caret range:', e);
+    }
+  }
+  return false;
+}
+
+/**
+ * Inserts an image block at the exact position clicked by the user
+ */
+function insertImageAtUserPosition(imgElement, alignContainerStyle) {
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  if (!visualEditor) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'email-image-block';
+  wrapper.style.cssText = alignContainerStyle;
+  wrapper.appendChild(imgElement);
+
+  const spacerP = document.createElement('p');
+  spacerP.innerHTML = '<br/>';
+
+  let inserted = false;
+
+  // 1. Try splitting at exact savedVisualEditorRange (ONLY if inside an actual child element, NOT visualEditor root!)
+  if (savedVisualEditorRange) {
+    try {
+      const range = savedVisualEditorRange;
+      const container = range.startContainer;
+
+      // CRITICAL: If container IS visualEditor itself (empty space clicked), DO NOT use range.insertNode at offset 0!
+      if (container && container !== visualEditor && visualEditor.contains(container)) {
+        let parentEl = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
+
+        // Find enclosing block (P, DIV, H1-H6, BLOCKQUOTE, etc.)
+        let enclosingBlock = parentEl;
+        while (enclosingBlock && enclosingBlock.parentNode && enclosingBlock.parentNode !== visualEditor && enclosingBlock.tagName !== 'DIV' && enclosingBlock.tagName !== 'P' && !/^H[1-6]$/.test(enclosingBlock.tagName)) {
+          enclosingBlock = enclosingBlock.parentElement;
+        }
+
+        if (enclosingBlock && enclosingBlock !== visualEditor && visualEditor.contains(enclosingBlock)) {
+          const textLength = enclosingBlock.textContent ? enclosingBlock.textContent.length : 0;
+          const isAtEnd = (container.nodeType === Node.TEXT_NODE && range.startOffset >= (container.length || 0)) ||
+                          (range.startOffset >= textLength);
+
+          if (isAtEnd) {
+            // Cursor is at end of the block - insert right after it!
+            enclosingBlock.parentNode.insertBefore(wrapper, enclosingBlock.nextSibling);
+            enclosingBlock.parentNode.insertBefore(spacerP, wrapper.nextSibling);
+            inserted = true;
+          } else {
+            // Cursor is in the middle - split block at range!
+            try {
+              const endRange = document.createRange();
+              endRange.setStart(range.startContainer, range.startOffset);
+              endRange.setEndAfter(enclosingBlock.lastChild || enclosingBlock);
+
+              const extractedFrag = endRange.extractContents();
+
+              enclosingBlock.parentNode.insertBefore(wrapper, enclosingBlock.nextSibling);
+
+              const afterBlock = document.createElement(enclosingBlock.tagName || 'p');
+              if (enclosingBlock.style.cssText) afterBlock.style.cssText = enclosingBlock.style.cssText;
+              if (extractedFrag && extractedFrag.childNodes.length > 0) {
+                afterBlock.appendChild(extractedFrag);
+              } else {
+                afterBlock.innerHTML = '<br/>';
+              }
+
+              wrapper.parentNode.insertBefore(afterBlock, wrapper.nextSibling);
+              inserted = true;
+            } catch (splitErr) {
+              enclosingBlock.parentNode.insertBefore(wrapper, enclosingBlock.nextSibling);
+              enclosingBlock.parentNode.insertBefore(spacerP, wrapper.nextSibling);
+              inserted = true;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Range insertion error:', err);
+    }
+  }
+
+  // 2. Fallback to lastRecordedTarget or lastClickedEditorBlock (inserts right after that element)
+  const targetNode = lastRecordedTarget || lastClickedEditorBlock;
+  if (!inserted && targetNode && visualEditor.contains(targetNode) && targetNode !== visualEditor) {
+    let block = targetNode;
+    while (block.parentNode && block.parentNode !== visualEditor && block.parentNode.tagName !== 'DIV') {
+      block = block.parentNode;
+    }
+    if (block && block.parentNode) {
+      block.parentNode.insertBefore(wrapper, block.nextSibling);
+      block.parentNode.insertBefore(spacerP, wrapper.nextSibling);
+      inserted = true;
+    }
+  }
+
+  // 3. Absolute fallback: append to the end of the email content (NEVER at the top!)
+  if (!inserted) {
+    const targetParent = (visualEditor.firstElementChild && visualEditor.firstElementChild.tagName === 'DIV' && !visualEditor.firstElementChild.classList.contains('email-image-block'))
+      ? visualEditor.firstElementChild
+      : visualEditor;
+
+    targetParent.appendChild(wrapper);
+    targetParent.appendChild(spacerP);
+    inserted = true;
+  }
+
+  // Set the newly inserted wrapper as the active position
+  lastRecordedTarget = wrapper;
+  lastClickedEditorBlock = wrapper;
+
+  syncVisualToCode();
+  updateLivePreview();
+}
+
+function insertHtmlAtCaret(html) {
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  if (!visualEditor) return;
+
+  restoreVisualEditorCaret();
+
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    if (visualEditor.contains(range.commonAncestorContainer) || range.commonAncestorContainer === visualEditor) {
+      const success = document.execCommand('insertHTML', false, html);
+      if (!success) {
+        range.deleteContents();
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const frag = document.createDocumentFragment();
+        let node, lastNode;
+        while ((node = tempDiv.firstChild)) {
+          lastNode = frag.appendChild(node);
+        }
+        range.insertNode(frag);
+        if (lastNode) {
+          range.setStartAfter(lastNode);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+      saveVisualEditorCaret();
+      return;
+    }
+  }
+
+  // Fallback
+  visualEditor.focus();
+  document.execCommand('insertHTML', false, html);
+  saveVisualEditorCaret();
+}
+
+/**
  * Execute Rich Text Formatting Commands
  */
 function execVisualCmd(command, value = null) {
   const visualEditor = document.getElementById('tpl-visual-editor');
   if (!visualEditor) return;
 
+  restoreVisualEditorCaret();
   visualEditor.focus();
   document.execCommand(command, false, value);
+  saveVisualEditorCaret();
   syncVisualToCode();
   updateLivePreview();
 }
@@ -178,20 +415,25 @@ function applyBlockStyle(tag) {
   const visualEditor = document.getElementById('tpl-visual-editor');
   if (!visualEditor) return;
 
+  restoreVisualEditorCaret();
   visualEditor.focus();
   document.execCommand('formatBlock', false, `<${tag}>`);
+  saveVisualEditorCaret();
   syncVisualToCode();
   updateLivePreview();
 }
 
 function insertLinkPrompt() {
+  saveVisualEditorCaret();
   const url = prompt('Enter website link (URL):', 'https://');
   if (url && url !== 'https://') {
+    restoreVisualEditorCaret();
     execVisualCmd('createLink', url);
   }
 }
 
 function insertCtaButtonPrompt() {
+  saveVisualEditorCaret();
   const text = prompt('Enter button text (e.g. Schedule Call / Claim Offer):', 'Schedule a Call');
   if (!text) return;
 
@@ -206,7 +448,9 @@ function insertCtaButtonPrompt() {
     </div>
   `;
 
-  execVisualCmd('insertHTML', buttonHtml);
+  insertHtmlAtCaret(buttonHtml);
+  syncVisualToCode();
+  updateLivePreview();
 }
 
 /**
@@ -216,7 +460,9 @@ function syncVisualToCode() {
   const visualEditor = document.getElementById('tpl-visual-editor');
   const codeEditor = document.getElementById('tpl-input-html');
   if (visualEditor && codeEditor) {
-    codeEditor.value = visualEditor.innerHTML;
+    let cleanHtml = visualEditor.innerHTML;
+    cleanHtml = cleanHtml.replace(/\s*class="selected-img"/g, '');
+    codeEditor.value = cleanHtml;
   }
 }
 
@@ -231,6 +477,14 @@ function setupLivePreviewListeners() {
 
   // Real-time synchronization on every keystroke, spacebar, input, or paste!
   if (visualEditor) {
+    ['click', 'mouseup', 'keyup', 'focus', 'input', 'select', 'touchend'].forEach(evt => {
+      visualEditor.addEventListener(evt, updateCaretTracking);
+    });
+
+    document.addEventListener('selectionchange', () => {
+      saveVisualEditorCaret();
+    });
+
     ['input', 'keyup', 'change', 'paste'].forEach(evt => {
       visualEditor.addEventListener(evt, () => {
         syncVisualToCode();
@@ -279,12 +533,8 @@ function insertVariableTag(tag) {
     const visualEditor = document.getElementById('tpl-visual-editor');
     if (!visualEditor) return;
 
-    visualEditor.focus();
-    // Insert pill tag HTML or text
     const pillHtml = `<strong>${tag}</strong>&nbsp;`;
-    if (!document.execCommand('insertHTML', false, pillHtml)) {
-      visualEditor.innerHTML += pillHtml;
-    }
+    insertHtmlAtCaret(pillHtml);
     syncVisualToCode();
   } else {
     const target = document.getElementById('tpl-input-html');
@@ -514,6 +764,768 @@ function promptCustomVariableTag() {
   insertVariableTag(tag);
 }
 
+/**
+ * ========================================================
+ * Image Upload & Interactive Resizing System for Studio
+ * ========================================================
+ */
+let activeSelectedImage = null;
+let isResizingImage = false;
+let selectedImageFile = null;
+let currentImageModalTab = 'upload';
+let imageSystemInitialized = false;
+let isAspectRatioLocked = false;
+
+function openImageModal() {
+  saveVisualEditorCaret();
+  selectedImageFile = null;
+  currentImageModalTab = 'upload';
+
+  const fileInput = document.getElementById('img-file-input');
+  if (fileInput) fileInput.value = '';
+  const urlInput = document.getElementById('img-url-input');
+  if (urlInput) urlInput.value = '';
+  const altInput = document.getElementById('img-modal-alt');
+  if (altInput) altInput.value = '';
+  const linkInput = document.getElementById('img-modal-link');
+  if (linkInput) linkInput.value = '';
+
+  const previewCard = document.getElementById('img-file-preview-card');
+  if (previewCard) previewCard.style.display = 'none';
+  const urlPreview = document.getElementById('img-url-preview-wrap');
+  if (urlPreview) urlPreview.style.display = 'none';
+  const dropzone = document.getElementById('img-upload-dropzone');
+  if (dropzone) dropzone.style.display = 'block';
+
+  switchImageModalTab('upload');
+  openModal('modal-insert-image');
+}
+
+function closeImageModal() {
+  closeModal('modal-insert-image');
+  selectedImageFile = null;
+}
+
+function switchImageModalTab(tab) {
+  currentImageModalTab = tab;
+  const tabBtnUpload = document.getElementById('tab-btn-img-upload');
+  const tabBtnUrl = document.getElementById('tab-btn-img-url');
+  const paneUpload = document.getElementById('pane-img-upload');
+  const paneUrl = document.getElementById('pane-img-url');
+
+  if (tab === 'upload') {
+    if (tabBtnUpload) tabBtnUpload.classList.add('active');
+    if (tabBtnUrl) tabBtnUrl.classList.remove('active');
+    if (paneUpload) paneUpload.style.display = 'block';
+    if (paneUrl) paneUrl.style.display = 'none';
+  } else {
+    if (tabBtnUpload) tabBtnUpload.classList.remove('active');
+    if (tabBtnUrl) tabBtnUrl.classList.add('active');
+    if (paneUpload) paneUpload.style.display = 'none';
+    if (paneUrl) paneUrl.style.display = 'block';
+  }
+}
+
+function handleImageFileSelected(file) {
+  if (!file) return;
+  if (!file.type || !file.type.startsWith('image/')) {
+    showToast('Please select a valid image file (PNG, JPG, WebP, GIF, SVG)', 'warning');
+    return;
+  }
+
+  selectedImageFile = file;
+
+  const previewCard = document.getElementById('img-file-preview-card');
+  const previewThumb = document.getElementById('img-file-preview-thumb');
+  const fileName = document.getElementById('img-file-name');
+  const fileMeta = document.getElementById('img-file-meta');
+  const dropzone = document.getElementById('img-upload-dropzone');
+
+  if (fileName) fileName.textContent = file.name;
+  if (fileMeta) fileMeta.textContent = `${(file.size / 1024).toFixed(1)} KB • ${file.type}`;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    if (previewThumb) previewThumb.src = e.target.result;
+    if (previewCard) previewCard.style.display = 'block';
+    if (dropzone) dropzone.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImageUploadSelection() {
+  selectedImageFile = null;
+  const fileInput = document.getElementById('img-file-input');
+  if (fileInput) fileInput.value = '';
+  const previewCard = document.getElementById('img-file-preview-card');
+  if (previewCard) previewCard.style.display = 'none';
+  const dropzone = document.getElementById('img-upload-dropzone');
+  if (dropzone) dropzone.style.display = 'block';
+}
+
+function handleImageUrlInput(url) {
+  const previewWrap = document.getElementById('img-url-preview-wrap');
+  const previewThumb = document.getElementById('img-url-preview-thumb');
+  const cleanUrl = (url || '').trim();
+
+  if (cleanUrl.match(/^https?:\/\/.+/i) || cleanUrl.startsWith('data:image')) {
+    if (previewThumb) previewThumb.src = cleanUrl;
+    if (previewWrap) previewWrap.style.display = 'block';
+  } else {
+    if (previewWrap) previewWrap.style.display = 'none';
+  }
+}
+
+async function submitInsertImage() {
+  const submitBtn = document.getElementById('btn-insert-image-submit');
+  const alt = (document.getElementById('img-modal-alt')?.value || '').trim();
+  const link = (document.getElementById('img-modal-link')?.value || '').trim();
+  const widthSelect = document.getElementById('img-modal-width-select')?.value || '50%';
+  const align = document.getElementById('img-modal-align-select')?.value || 'center';
+
+  let finalImageUrl = '';
+
+  if (currentImageModalTab === 'upload') {
+    if (!selectedImageFile) {
+      showToast('Please select or drop an image file first!', 'warning');
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading...';
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('image', selectedImageFile);
+
+      const res = await fetch('/api/templates/upload-image', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to upload image to server');
+      }
+
+      finalImageUrl = data.url;
+    } catch (uploadErr) {
+      console.warn('Server upload failed, falling back to embedded data URL:', uploadErr);
+      finalImageUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(selectedImageFile);
+      });
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Insert Image →';
+      }
+    }
+  } else {
+    finalImageUrl = (document.getElementById('img-url-input')?.value || '').trim();
+    if (!finalImageUrl) {
+      showToast('Please enter an image URL!', 'warning');
+      return;
+    }
+  }
+
+  insertImageToEditor({
+    url: finalImageUrl,
+    alt,
+    width: widthSelect,
+    align,
+    link
+  });
+
+  closeImageModal();
+  showToast('Image inserted successfully!', 'success');
+}
+
+function insertImageToEditor({ url, alt = '', width = '50%', align = 'center', link = '' }) {
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  if (!visualEditor) return;
+
+  visualEditor.focus();
+
+  let widthStyle = 'width: 50%; max-width: 100%;';
+  let attrWidth = '400';
+  if (width === '100%') {
+    widthStyle = 'width: 100%; max-width: 100%;';
+    attrWidth = '600';
+  } else if (width === '75%') {
+    widthStyle = 'width: 75%; max-width: 100%;';
+    attrWidth = '500';
+  } else if (width === '50%') {
+    widthStyle = 'width: 50%; max-width: 100%;';
+    attrWidth = '400';
+  } else if (width === '25%') {
+    widthStyle = 'width: 25%; max-width: 100%;';
+    attrWidth = '200';
+  } else if (width === 'custom') {
+    widthStyle = 'width: 400px; max-width: 100%;';
+    attrWidth = '400';
+  }
+
+  let alignContainerStyle = 'text-align: center; margin: 18px 0;';
+  let imgMarginStyle = 'margin: 0 auto; display: block;';
+  if (align === 'left') {
+    alignContainerStyle = 'text-align: left; margin: 18px 0;';
+    imgMarginStyle = 'margin: 0 auto 0 0; display: block;';
+  } else if (align === 'right') {
+    alignContainerStyle = 'text-align: right; margin: 18px 0;';
+    imgMarginStyle = 'margin: 0 0 0 auto; display: block;';
+  }
+
+  const escapedUrl = escapeHtml(url);
+  const escapedAlt = escapeHtml(alt);
+
+  const img = document.createElement('img');
+  img.src = escapedUrl;
+  img.alt = escapedAlt;
+  img.setAttribute('width', attrWidth);
+  img.style.cssText = `${widthStyle} height: auto; ${imgMarginStyle} border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);`;
+
+  let insertElem = img;
+  if (link && link.trim()) {
+    const a = document.createElement('a');
+    a.href = escapeHtml(link.trim());
+    a.target = '_blank';
+    a.style.cssText = 'text-decoration: none; display: inline-block;';
+    a.appendChild(img);
+    insertElem = a;
+  }
+
+  insertImageAtUserPosition(insertElem, alignContainerStyle);
+
+  setTimeout(() => {
+    selectImageForResize(img);
+  }, 60);
+}
+
+function selectImageForResize(img) {
+  if (!img) return;
+  activeSelectedImage = img;
+
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  if (visualEditor) {
+    visualEditor.querySelectorAll('img').forEach(el => el.classList.remove('selected-img'));
+  }
+  img.classList.add('selected-img');
+
+  const overlay = document.getElementById('image-resizer-overlay');
+  if (overlay) {
+    overlay.style.display = 'block';
+  }
+
+  updateResizerOverlayPosition();
+  updateFloatingToolbarValues();
+}
+
+function deselectImage() {
+  if (activeSelectedImage) {
+    activeSelectedImage.classList.remove('selected-img');
+    activeSelectedImage = null;
+  }
+  const overlay = document.getElementById('image-resizer-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+function updateResizerOverlayPosition() {
+  if (!activeSelectedImage || !activeSelectedImage.isConnected) {
+    deselectImage();
+    return;
+  }
+
+  const overlay = document.getElementById('image-resizer-overlay');
+  const container = document.getElementById('visual-editor-container');
+  if (!overlay || !container) return;
+
+  const imgRect = activeSelectedImage.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  const top = imgRect.top - containerRect.top;
+  const left = imgRect.left - containerRect.left;
+
+  overlay.style.top = `${top}px`;
+  overlay.style.left = `${left}px`;
+  overlay.style.width = `${imgRect.width}px`;
+  overlay.style.height = `${imgRect.height}px`;
+
+  const badge = document.getElementById('image-dimension-badge');
+  if (badge) {
+    badge.textContent = `${Math.round(imgRect.width)} × ${Math.round(imgRect.height)} px`;
+  }
+}
+
+function updateFloatingToolbarValues() {
+  if (!activeSelectedImage) return;
+
+  const imgRect = activeSelectedImage.getBoundingClientRect();
+  const widthInput = document.getElementById('img-custom-width-input');
+  if (widthInput) {
+    widthInput.value = Math.round(imgRect.width);
+  }
+
+  const heightInput = document.getElementById('img-custom-height-input');
+  if (heightInput) {
+    if (activeSelectedImage.style.height && activeSelectedImage.style.height !== 'auto') {
+      heightInput.value = Math.round(imgRect.height);
+    } else {
+      heightInput.value = '';
+      heightInput.placeholder = `${Math.round(imgRect.height)} (auto)`;
+    }
+  }
+
+  const btnAutoH = document.getElementById('btn-img-auto-height');
+  if (btnAutoH) {
+    const isAuto = !activeSelectedImage.style.height || activeSelectedImage.style.height === 'auto';
+    btnAutoH.classList.toggle('active', isAuto);
+  }
+
+  const btnLock = document.getElementById('btn-img-ratio-lock');
+  if (btnLock) {
+    btnLock.textContent = isAspectRatioLocked ? '🔒 Lock' : '🔓 Free';
+    btnLock.classList.toggle('active', isAspectRatioLocked);
+  }
+
+  const btnLeft = document.getElementById('btn-img-align-left');
+  const btnCenter = document.getElementById('btn-img-align-center');
+  const btnRight = document.getElementById('btn-img-align-right');
+
+  [btnLeft, btnCenter, btnRight].forEach(b => b?.classList.remove('active'));
+
+  const parent = activeSelectedImage.parentElement;
+  const grandParent = parent?.parentElement;
+  const textAlign = (parent?.style?.textAlign || grandParent?.style?.textAlign || '').toLowerCase();
+  const margin = activeSelectedImage.style.margin || '';
+
+  if (textAlign === 'left' || activeSelectedImage.style.marginLeft === '0px' || margin.includes('0 auto 0 0')) {
+    btnLeft?.classList.add('active');
+  } else if (textAlign === 'right' || activeSelectedImage.style.marginRight === '0px' || margin.includes('0 0 0 auto')) {
+    btnRight?.classList.add('active');
+  } else {
+    btnCenter?.classList.add('active');
+  }
+}
+
+function toggleAspectRatioLock() {
+  isAspectRatioLocked = !isAspectRatioLocked;
+  const btn = document.getElementById('btn-img-ratio-lock');
+  if (btn) {
+    btn.textContent = isAspectRatioLocked ? '🔒 Lock' : '🔓 Free';
+    btn.classList.toggle('active', isAspectRatioLocked);
+  }
+  showToast(isAspectRatioLocked ? 'Aspect Ratio Locked (Proportional)' : 'Aspect Ratio Unlocked (Free Resize)', 'info');
+}
+
+function setImagePresetWidth(preset) {
+  if (!activeSelectedImage) return;
+
+  activeSelectedImage.style.width = preset;
+  activeSelectedImage.style.maxWidth = '100%';
+
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  const canvasWidth = visualEditor ? visualEditor.clientWidth - 72 : 600;
+  const approxPx = Math.round(canvasWidth * (parseInt(preset, 10) / 100));
+  activeSelectedImage.setAttribute('width', approxPx);
+
+  // If height was not explicitly fixed, keep it auto, otherwise preserve banner height
+  if (!activeSelectedImage.style.height) {
+    activeSelectedImage.style.height = 'auto';
+  }
+
+  updateResizerOverlayPosition();
+  updateFloatingToolbarValues();
+  syncVisualToCode();
+  updateLivePreview();
+}
+
+function setImagePixelWidth(val) {
+  if (!activeSelectedImage) return;
+  const px = parseInt(val, 10);
+  if (isNaN(px) || px < 30) return;
+
+  activeSelectedImage.style.width = `${px}px`;
+  activeSelectedImage.style.maxWidth = '100%';
+  activeSelectedImage.setAttribute('width', px);
+
+  updateResizerOverlayPosition();
+  updateFloatingToolbarValues();
+  syncVisualToCode();
+  updateLivePreview();
+}
+
+function setImagePixelHeight(val) {
+  if (!activeSelectedImage) return;
+  const px = parseInt(val, 10);
+  if (isNaN(px) || px < 20) return;
+
+  activeSelectedImage.style.height = `${px}px`;
+  activeSelectedImage.setAttribute('height', px);
+  activeSelectedImage.style.objectFit = 'cover';
+
+  updateResizerOverlayPosition();
+  updateFloatingToolbarValues();
+  syncVisualToCode();
+  updateLivePreview();
+}
+
+function resetImageHeightAuto() {
+  if (!activeSelectedImage) return;
+
+  activeSelectedImage.style.height = 'auto';
+  activeSelectedImage.removeAttribute('height');
+  activeSelectedImage.style.objectFit = '';
+
+  updateResizerOverlayPosition();
+  updateFloatingToolbarValues();
+  syncVisualToCode();
+  updateLivePreview();
+  showToast('Image height reset to auto (proportional)', 'info');
+}
+
+function setImageAlignment(align) {
+  if (!activeSelectedImage) return;
+
+  let block = activeSelectedImage.closest('.email-image-block');
+  if (!block && activeSelectedImage.parentElement && activeSelectedImage.parentElement.tagName === 'DIV') {
+    block = activeSelectedImage.parentElement;
+  }
+
+  if (align === 'center') {
+    if (block) block.style.textAlign = 'center';
+    activeSelectedImage.style.display = 'block';
+    activeSelectedImage.style.marginLeft = 'auto';
+    activeSelectedImage.style.marginRight = 'auto';
+  } else if (align === 'left') {
+    if (block) block.style.textAlign = 'left';
+    activeSelectedImage.style.display = 'block';
+    activeSelectedImage.style.marginLeft = '0';
+    activeSelectedImage.style.marginRight = 'auto';
+  } else if (align === 'right') {
+    if (block) block.style.textAlign = 'right';
+    activeSelectedImage.style.display = 'block';
+    activeSelectedImage.style.marginLeft = 'auto';
+    activeSelectedImage.style.marginRight = '0';
+  }
+
+  updateResizerOverlayPosition();
+  updateFloatingToolbarValues();
+  syncVisualToCode();
+  updateLivePreview();
+}
+
+function promptImageLink() {
+  if (!activeSelectedImage) return;
+
+  const parent = activeSelectedImage.parentElement;
+  const isLinked = parent && parent.tagName === 'A';
+  const currentHref = isLinked ? parent.getAttribute('href') || '' : '';
+
+  const newUrl = prompt('Enter destination link (URL) for this image:', currentHref || 'https://');
+  if (newUrl === null) return;
+
+  const clean = newUrl.trim();
+  if (clean && clean !== 'https://') {
+    if (isLinked) {
+      parent.setAttribute('href', clean);
+      parent.setAttribute('target', '_blank');
+    } else {
+      const a = document.createElement('a');
+      a.href = clean;
+      a.target = '_blank';
+      a.style.textDecoration = 'none';
+      a.style.display = 'inline-block';
+      activeSelectedImage.parentNode.insertBefore(a, activeSelectedImage);
+      a.appendChild(activeSelectedImage);
+    }
+    showToast('Image link attached!', 'success');
+  } else if (isLinked && (!clean || clean === 'https://')) {
+    parent.parentNode.insertBefore(activeSelectedImage, parent);
+    parent.remove();
+    showToast('Image link removed', 'info');
+  }
+
+  updateResizerOverlayPosition();
+  syncVisualToCode();
+  updateLivePreview();
+}
+
+function deleteSelectedImage() {
+  if (!activeSelectedImage) return;
+
+  const parent = activeSelectedImage.parentElement;
+  const block = activeSelectedImage.closest('.email-image-block');
+
+  if (block && block.children.length <= 1) {
+    block.remove();
+  } else if (parent && parent.tagName === 'A' && parent.children.length <= 1) {
+    parent.remove();
+  } else {
+    activeSelectedImage.remove();
+  }
+
+  deselectImage();
+  syncVisualToCode();
+  updateLivePreview();
+  showToast('Image removed', 'info');
+}
+
+function setupImageDragResizing() {
+  const overlay = document.getElementById('image-resizer-overlay');
+  if (!overlay) return;
+
+  const handles = overlay.querySelectorAll('.resizer-handle');
+  handles.forEach(handle => {
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!activeSelectedImage) return;
+
+      isResizingImage = true;
+      const handleType = handle.getAttribute('data-handle');
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startWidth = activeSelectedImage.getBoundingClientRect().width;
+      const startHeight = activeSelectedImage.getBoundingClientRect().height;
+      const aspectRatio = startWidth / (startHeight || 1);
+
+      const visualEditor = document.getElementById('tpl-visual-editor');
+      const maxAllowedWidth = visualEditor ? visualEditor.clientWidth - 50 : 1200;
+
+      const onMouseMove = (moveEvt) => {
+        if (!isResizingImage || !activeSelectedImage) return;
+        moveEvt.preventDefault();
+
+        const deltaX = moveEvt.clientX - startX;
+        const deltaY = moveEvt.clientY - startY;
+
+        let newWidth = startWidth;
+        let newHeight = startHeight;
+
+        // 1. WIDTH ONLY RESIZING (East or West handles)
+        if (handleType === 'e') {
+          newWidth = startWidth + deltaX;
+          if (newWidth < 40) newWidth = 40;
+          if (newWidth > maxAllowedWidth) newWidth = maxAllowedWidth;
+
+          activeSelectedImage.style.width = `${Math.round(newWidth)}px`;
+          activeSelectedImage.setAttribute('width', Math.round(newWidth));
+          // Explicitly keep height unchanged as requested!
+          activeSelectedImage.style.height = `${Math.round(startHeight)}px`;
+          activeSelectedImage.setAttribute('height', Math.round(startHeight));
+          activeSelectedImage.style.objectFit = 'cover';
+        } else if (handleType === 'w') {
+          newWidth = startWidth - deltaX;
+          if (newWidth < 40) newWidth = 40;
+          if (newWidth > maxAllowedWidth) newWidth = maxAllowedWidth;
+
+          activeSelectedImage.style.width = `${Math.round(newWidth)}px`;
+          activeSelectedImage.setAttribute('width', Math.round(newWidth));
+          // Explicitly keep height unchanged as requested!
+          activeSelectedImage.style.height = `${Math.round(startHeight)}px`;
+          activeSelectedImage.setAttribute('height', Math.round(startHeight));
+          activeSelectedImage.style.objectFit = 'cover';
+        }
+        // 2. HEIGHT ONLY RESIZING (North or South handles)
+        else if (handleType === 's') {
+          newHeight = startHeight + deltaY;
+          if (newHeight < 25) newHeight = 25;
+
+          activeSelectedImage.style.height = `${Math.round(newHeight)}px`;
+          activeSelectedImage.setAttribute('height', Math.round(newHeight));
+          // Width stays unchanged!
+          activeSelectedImage.style.width = `${Math.round(startWidth)}px`;
+          activeSelectedImage.setAttribute('width', Math.round(startWidth));
+          activeSelectedImage.style.objectFit = 'cover';
+        } else if (handleType === 'n') {
+          newHeight = startHeight - deltaY;
+          if (newHeight < 25) newHeight = 25;
+
+          activeSelectedImage.style.height = `${Math.round(newHeight)}px`;
+          activeSelectedImage.setAttribute('height', Math.round(newHeight));
+          // Width stays unchanged!
+          activeSelectedImage.style.width = `${Math.round(startWidth)}px`;
+          activeSelectedImage.setAttribute('width', Math.round(startWidth));
+          activeSelectedImage.style.objectFit = 'cover';
+        }
+        // 3. CORNER HANDLES (nw, ne, se, sw)
+        else {
+          if (handleType === 'se' || handleType === 'ne') {
+            newWidth = startWidth + deltaX;
+          } else {
+            newWidth = startWidth - deltaX;
+          }
+
+          if (newWidth < 40) newWidth = 40;
+          if (newWidth > maxAllowedWidth) newWidth = maxAllowedWidth;
+
+          if (isAspectRatioLocked && !moveEvt.shiftKey) {
+            newHeight = newWidth / aspectRatio;
+            activeSelectedImage.style.width = `${Math.round(newWidth)}px`;
+            activeSelectedImage.setAttribute('width', Math.round(newWidth));
+            activeSelectedImage.style.height = `${Math.round(newHeight)}px`;
+            activeSelectedImage.setAttribute('height', Math.round(newHeight));
+          } else {
+            // Free 2D resizing!
+            if (handleType === 'se' || handleType === 'sw') {
+              newHeight = startHeight + deltaY;
+            } else {
+              newHeight = startHeight - deltaY;
+            }
+            if (newHeight < 25) newHeight = 25;
+
+            activeSelectedImage.style.width = `${Math.round(newWidth)}px`;
+            activeSelectedImage.setAttribute('width', Math.round(newWidth));
+            activeSelectedImage.style.height = `${Math.round(newHeight)}px`;
+            activeSelectedImage.setAttribute('height', Math.round(newHeight));
+            activeSelectedImage.style.objectFit = 'cover';
+          }
+        }
+
+        activeSelectedImage.style.maxWidth = '100%';
+        updateResizerOverlayPosition();
+
+        const badge = document.getElementById('image-dimension-badge');
+        if (badge) {
+          const curW = Math.round(activeSelectedImage.getBoundingClientRect().width);
+          const curH = Math.round(activeSelectedImage.getBoundingClientRect().height);
+          badge.textContent = `${curW} × ${curH} px`;
+        }
+      };
+
+      const onMouseUp = () => {
+        isResizingImage = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        updateFloatingToolbarValues();
+        syncVisualToCode();
+        updateLivePreview();
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  });
+}
+
+function initImageResizerSystem() {
+  if (imageSystemInitialized) return;
+  imageSystemInitialized = true;
+
+  const visualEditor = document.getElementById('tpl-visual-editor');
+  const editorPane = document.querySelector('.editor-pane');
+
+  if (visualEditor) {
+    visualEditor.addEventListener('click', (e) => {
+      if (e.target && e.target.tagName === 'IMG') {
+        selectImageForResize(e.target);
+      } else {
+        deselectImage();
+      }
+    });
+
+    visualEditor.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf('image') !== -1) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (file) {
+            handleImageFileSelected(file);
+            submitInsertImage();
+          }
+          return;
+        }
+      }
+    });
+
+    visualEditor.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    visualEditor.addEventListener('drop', (e) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+        const file = e.dataTransfer.files[0];
+        if (file && file.type && file.type.startsWith('image/')) {
+          e.preventDefault();
+          if (document.caretRangeFromPoint) {
+            savedVisualEditorRange = document.caretRangeFromPoint(e.clientX, e.clientY);
+          } else if (document.caretPositionFromPoint) {
+            const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+            if (pos) {
+              savedVisualEditorRange = document.createRange();
+              savedVisualEditorRange.setStart(pos.offsetNode, pos.offset);
+              savedVisualEditorRange.collapse(true);
+            }
+          }
+          handleImageFileSelected(file);
+          submitInsertImage();
+        }
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (activeSelectedImage) {
+      if (e.key === 'Escape') {
+        deselectImage();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeTag = document.activeElement ? document.activeElement.tagName : '';
+        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+          e.preventDefault();
+          deleteSelectedImage();
+        }
+      }
+    }
+  });
+
+  if (editorPane) {
+    editorPane.addEventListener('scroll', () => {
+      if (activeSelectedImage) updateResizerOverlayPosition();
+    });
+  }
+
+  if (visualEditor) {
+    visualEditor.addEventListener('scroll', () => {
+      if (activeSelectedImage) updateResizerOverlayPosition();
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    if (activeSelectedImage) updateResizerOverlayPosition();
+  });
+
+  setupImageDragResizing();
+
+  const modalDropzone = document.getElementById('img-upload-dropzone');
+  if (modalDropzone) {
+    modalDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      modalDropzone.classList.add('drag-over');
+    });
+    modalDropzone.addEventListener('dragleave', () => {
+      modalDropzone.classList.remove('drag-over');
+    });
+    modalDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      modalDropzone.classList.remove('drag-over');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+        handleImageFileSelected(e.dataTransfer.files[0]);
+      }
+    });
+  }
+}
+
+// Window Global Exports
 window.loadTemplatesView = loadTemplatesView;
 window.openTemplateEditor = openTemplateEditor;
 window.closeTemplateStudio = closeTemplateStudio;
@@ -531,3 +1543,23 @@ window.applyBlockStyle = applyBlockStyle;
 window.insertLinkPrompt = insertLinkPrompt;
 window.insertCtaButtonPrompt = insertCtaButtonPrompt;
 window.promptCustomVariableTag = promptCustomVariableTag;
+
+// Image System Exports
+window.openImageModal = openImageModal;
+window.closeImageModal = closeImageModal;
+window.switchImageModalTab = switchImageModalTab;
+window.handleImageFileSelected = handleImageFileSelected;
+window.clearImageUploadSelection = clearImageUploadSelection;
+window.handleImageUrlInput = handleImageUrlInput;
+window.submitInsertImage = submitInsertImage;
+window.setImagePresetWidth = setImagePresetWidth;
+window.setImagePixelWidth = setImagePixelWidth;
+window.setImagePixelHeight = setImagePixelHeight;
+window.resetImageHeightAuto = resetImageHeightAuto;
+window.toggleAspectRatioLock = toggleAspectRatioLock;
+window.setImageAlignment = setImageAlignment;
+window.promptImageLink = promptImageLink;
+window.deleteSelectedImage = deleteSelectedImage;
+window.deselectImage = deselectImage;
+window.initImageResizerSystem = initImageResizerSystem;
+

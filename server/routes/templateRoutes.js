@@ -1,7 +1,39 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { getPool } = require('../db/pool');
-const { extractVariables, renderEmail, interpolate } = require('../services/templateEngine');
+const { extractVariables, renderEmail, interpolate, registerImageUrlMapping } = require('../services/templateEngine');
+
+// Setup upload directory for template images
+const imagesUploadDir = path.join(__dirname, '../../uploads/images');
+if (!fs.existsSync(imagesUploadDir)) {
+  fs.mkdirSync(imagesUploadDir, { recursive: true });
+}
+
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, imagesUploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const cleanBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `${cleanBase}-${uniqueSuffix}${ext}`);
+  }
+});
+
+const uploadImage = multer({
+  storage: imageStorage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    if (allowed.includes(file.mimetype.toLowerCase())) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files (PNG, JPG, GIF, WebP, SVG) are allowed!'));
+    }
+  }
+});
 
 // GET /api/templates - List all templates
 router.get('/', async (req, res) => {
@@ -135,6 +167,61 @@ router.post('/preview', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/templates/upload-image - Upload an image for templates
+router.post('/upload-image', (req, res) => {
+  uploadImage.single('image')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Image upload failed' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    const localUrl = `/uploads/images/${req.file.filename}`;
+    let publicUrl = localUrl;
+
+    const appUrl = (process.env.APP_URL || '').trim().replace(/\/$/, '');
+    if (appUrl && !appUrl.includes('localhost') && !appUrl.includes('127.0.0.1')) {
+      // Production deployed domain
+      publicUrl = `${appUrl}${localUrl}`;
+    } else {
+      // Local dev / testing: auto-upload to global CDN so Gmail proxy renders the image!
+      try {
+        const fileBuf = fs.readFileSync(req.file.path);
+        const b64 = fileBuf.toString('base64');
+        const form = new FormData();
+        form.append('key', '6d207e02198a847aa98d0a2a901485a5');
+        form.append('action', 'upload');
+        form.append('source', b64);
+        form.append('format', 'json');
+
+        const cdnRes = await fetch('https://freeimage.host/api/1/upload', {
+          method: 'POST',
+          body: form,
+          signal: AbortSignal.timeout(8000)
+        });
+        const cdnData = await cdnRes.json();
+        if (cdnData && cdnData.image && cdnData.image.url) {
+          publicUrl = cdnData.image.url;
+        }
+      } catch (cdnErr) {
+        console.warn('CDN sync failed, using local URL:', cdnErr.message);
+      }
+    }
+
+    registerImageUrlMapping(localUrl, publicUrl);
+
+    res.json({
+      success: true,
+      url: publicUrl,
+      localUrl,
+      filename: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+  });
 });
 
 module.exports = router;

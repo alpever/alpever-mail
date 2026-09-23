@@ -91,4 +91,21 @@ assert.strictEqual(customMapped.contacts[0].custom_fields.place, 'Jaipur');
 assert.strictEqual(customMapped.contacts[0].custom_fields.role, 'Director');
 console.log('  ✓ standardizeRows correctly honored explicit customMapping');
 
+// 4. Email Image URL Resolution & Email Client Safety Tests
+console.log('\n4️⃣ Testing Email Image URL Resolution...');
+const { resolveEmailImages } = require('../server/services/templateEngine');
+
+// Absolute URLs should remain untouched
+const htmlWithOnlineImg = '<p><img src="https://images.unsplash.com/photo-123" width="600" style="width: 600px; height: 180px; object-fit: cover;" /></p>';
+const resolvedOnline = resolveEmailImages(htmlWithOnlineImg);
+assert.strictEqual(resolvedOnline, htmlWithOnlineImg, 'Online absolute URLs should be preserved');
+console.log('  ✓ Online image URLs (https://) are preserved for email dispatch');
+
+// Relative URLs with APP_URL set should be made absolute
+process.env.APP_URL = 'https://mail.alpever.com';
+const htmlWithLocalImg = '<p><img src="/uploads/images/banner.png" width="600" /></p>';
+const resolvedWithDomain = resolveEmailImages(htmlWithLocalImg);
+assert(resolvedWithDomain.includes('https://mail.alpever.com/uploads/images/banner.png'), 'Should prepend APP_URL to local uploads');
+console.log('  ✓ Relative /uploads/ images are resolved to public absolute URLs with APP_URL');
+
 console.log('\n🎉 ALL UNIT TESTS PASSED SUCCESSFULLY! Everything is working properly.');

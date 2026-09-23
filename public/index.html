@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="/css/variables.css" />
   <link rel="stylesheet" href="/css/layout.css" />
   <link rel="stylesheet" href="/css/components.css" />
-  <link rel="stylesheet" href="/css/editor.css" />
+  <link rel="stylesheet" href="/css/editor.css?v=6" />
 </head>
 
 <body>
@@ -344,10 +344,13 @@
                     <div class="toolbar-separator"></div>
 
                     <div class="toolbar-btn-group">
-                      <button type="button" class="t-btn t-btn-cta" title="Insert Action Button" onclick="insertCtaButtonPrompt()">
+                      <button type="button" class="t-btn t-btn-cta" title="Insert Action Button" onmousedown="saveVisualEditorCaret()" onclick="insertCtaButtonPrompt()">
                         🔘 CTA Button
                       </button>
-                      <button type="button" class="t-btn" title="Insert Link" onclick="insertLinkPrompt()">🔗 Link</button>
+                      <button type="button" class="t-btn t-btn-img" title="Insert or Upload Image" onmousedown="saveVisualEditorCaret()" onclick="openImageModal()">
+                        🖼️ Image
+                      </button>
+                      <button type="button" class="t-btn" title="Insert Link" onmousedown="saveVisualEditorCaret()" onclick="insertLinkPrompt()">🔗 Link</button>
                       <button type="button" class="t-btn" title="Insert Divider Line" onclick="execVisualCmd('insertHorizontalRule')">➖</button>
                       <button type="button" class="t-btn" title="Clear Formatting" onclick="execVisualCmd('removeFormat')">🧹</button>
                     </div>
@@ -367,9 +370,60 @@
                 <div style="display: none;" id="editor-mode-label"></div>
 
                 <!-- Visual Editor Container -->
-                <div id="visual-editor-container" class="studio-canvas-viewport">
+                <div id="visual-editor-container" class="studio-canvas-viewport" style="position: relative;">
                   <!-- Visual Contenteditable Canvas (Clean Document Sheet) -->
                   <div class="visual-editor-canvas" id="tpl-visual-editor" contenteditable="true" spellcheck="true"></div>
+
+                  <!-- Interactive Image Resizer Overlay (Separated from innerHTML so clean email HTML is preserved!) -->
+                  <div id="image-resizer-overlay" class="image-resizer-overlay" style="display: none;">
+                    <div class="resizer-handle nw" data-handle="nw" title="Drag to resize"></div>
+                    <div class="resizer-handle n" data-handle="n" title="Drag to resize height only"></div>
+                    <div class="resizer-handle ne" data-handle="ne" title="Drag to resize"></div>
+                    <div class="resizer-handle e" data-handle="e" title="Drag to resize width only"></div>
+                    <div class="resizer-handle se" data-handle="se" title="Drag to resize"></div>
+                    <div class="resizer-handle s" data-handle="s" title="Drag to resize height only"></div>
+                    <div class="resizer-handle sw" data-handle="sw" title="Drag to resize"></div>
+                    <div class="resizer-handle w" data-handle="w" title="Drag to resize width only"></div>
+
+                    <!-- Floating Image Quick Toolbar -->
+                    <div class="image-floating-toolbar" id="image-floating-toolbar">
+                      <div class="img-tb-group">
+                        <span class="img-tb-label">W:</span>
+                        <button type="button" class="img-tb-btn" onclick="setImagePresetWidth('25%')">25%</button>
+                        <button type="button" class="img-tb-btn" onclick="setImagePresetWidth('50%')">50%</button>
+                        <button type="button" class="img-tb-btn" onclick="setImagePresetWidth('75%')">75%</button>
+                        <button type="button" class="img-tb-btn" onclick="setImagePresetWidth('100%')">100%</button>
+                        <div class="img-tb-input-wrap">
+                          <input type="number" id="img-custom-width-input" min="30" max="1400" placeholder="W" onchange="setImagePixelWidth(this.value)" onkeydown="if(event.key==='Enter') setImagePixelWidth(this.value)" />
+                          <span class="img-tb-unit">px</span>
+                        </div>
+                      </div>
+                      <div class="img-tb-sep"></div>
+                      <div class="img-tb-group">
+                        <span class="img-tb-label">H:</span>
+                        <div class="img-tb-input-wrap">
+                          <input type="number" id="img-custom-height-input" min="20" max="1400" placeholder="auto" onchange="setImagePixelHeight(this.value)" onkeydown="if(event.key==='Enter') setImagePixelHeight(this.value)" />
+                          <span class="img-tb-unit">px</span>
+                        </div>
+                        <button type="button" class="img-tb-btn" id="btn-img-auto-height" title="Reset height to auto (proportional)" onclick="resetImageHeightAuto()">Auto H</button>
+                        <button type="button" class="img-tb-btn" id="btn-img-ratio-lock" title="Lock/Unlock Aspect Ratio for corner drag" onclick="toggleAspectRatioLock()">🔓 Free</button>
+                      </div>
+                      <div class="img-tb-sep"></div>
+                      <div class="img-tb-group">
+                        <button type="button" class="img-tb-btn" id="btn-img-align-left" title="Align Left" onclick="setImageAlignment('left')">⫷</button>
+                        <button type="button" class="img-tb-btn" id="btn-img-align-center" title="Align Center" onclick="setImageAlignment('center')">☰</button>
+                        <button type="button" class="img-tb-btn" id="btn-img-align-right" title="Align Right" onclick="setImageAlignment('right')">⫸</button>
+                      </div>
+                      <div class="img-tb-sep"></div>
+                      <div class="img-tb-group">
+                        <button type="button" class="img-tb-btn" title="Add / Edit Link" onclick="promptImageLink()">🔗 Link</button>
+                        <button type="button" class="img-tb-btn btn-danger-action" title="Delete Image" onclick="deleteSelectedImage()">🗑️</button>
+                      </div>
+                    </div>
+
+                    <!-- Live Dimension Badge -->
+                    <div class="image-dimension-badge" id="image-dimension-badge">400 × 260 px</div>
+                  </div>
                 </div>
 
                 <!-- Raw HTML Code Editor -->
@@ -818,13 +872,106 @@
     </div>
   </div>
 
+  <!-- MODAL: INSERT / UPLOAD IMAGE -->
+  <div class="modal-backdrop" id="modal-insert-image">
+    <div class="modal-dialog" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🖼️ Insert / Upload Image</h3>
+        <button class="btn-icon" onclick="closeImageModal()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px;">
+        <!-- Modal Tabs: Upload File vs Image URL -->
+        <div class="img-modal-tabs">
+          <button type="button" class="img-modal-tab-btn active" id="tab-btn-img-upload" onclick="switchImageModalTab('upload')">
+            📤 Upload from Computer
+          </button>
+          <button type="button" class="img-modal-tab-btn" id="tab-btn-img-url" onclick="switchImageModalTab('url')">
+            🔗 Web Image URL
+          </button>
+        </div>
+
+        <!-- Tab 1: Upload File Pane -->
+        <div id="pane-img-upload" class="img-modal-pane active">
+          <div class="img-dropzone" id="img-upload-dropzone" onclick="document.getElementById('img-file-input').click()">
+            <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml" style="display: none;" onchange="handleImageFileSelected(this.files[0])" />
+            <div class="img-drop-icon">📁</div>
+            <p class="img-drop-title">Drag & drop your image here, or <span>browse computer</span></p>
+            <p class="img-drop-sub">Supports PNG, JPG, WebP, GIF, SVG (Up to 20MB)</p>
+          </div>
+
+          <div id="img-file-preview-card" style="display: none; margin-top: 14px; padding: 12px; background: #f8fafc; border: 1px solid var(--border-subtle); border-radius: 8px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img id="img-file-preview-thumb" src="" alt="Preview" style="max-width: 80px; max-height: 80px; object-fit: contain; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff;" />
+              <div style="flex: 1; min-width: 0;">
+                <div id="img-file-name" style="font-weight: 600; font-size: 13px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">image.png</div>
+                <div id="img-file-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;"></div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="clearImageUploadSelection()">Change</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Web URL Pane -->
+        <div id="pane-img-url" class="img-modal-pane" style="display: none;">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Image Source URL:</label>
+            <input type="url" class="form-input" id="img-url-input" placeholder="https://example.com/logo.png" oninput="handleImageUrlInput(this.value)" />
+          </div>
+          <div id="img-url-preview-wrap" style="display: none; text-align: center; padding: 12px; background: #f8fafc; border: 1px solid var(--border-subtle); border-radius: 8px;">
+            <img id="img-url-preview-thumb" src="" alt="URL Preview" style="max-width: 100%; max-height: 140px; object-fit: contain;" onerror="this.parentElement.style.display='none'" />
+          </div>
+        </div>
+
+        <!-- Common Image Settings -->
+        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-subtle);">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+            <div class="form-group">
+              <label class="form-label" style="font-size: 12px;">Default Width:</label>
+              <select class="form-select" id="img-modal-width-select" style="font-size: 13px;">
+                <option value="100%">100% (Full Width)</option>
+                <option value="75%">75% Width</option>
+                <option value="50%" selected>50% Width</option>
+                <option value="25%">25% (Thumbnail)</option>
+                <option value="custom">Custom (400px)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size: 12px;">Alignment:</label>
+              <select class="form-select" id="img-modal-align-select" style="font-size: 13px;">
+                <option value="center" selected>Center ☰</option>
+                <option value="left">Left ⫷</option>
+                <option value="right">Right ⫸</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 10px;">
+            <label class="form-label" style="font-size: 12px;">Alt Text (Optional description):</label>
+            <input type="text" class="form-input" id="img-modal-alt" placeholder="e.g. Company Logo, Product Showcase" style="font-size: 13px;" />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 12px;">Clickable Link (Optional URL):</label>
+            <input type="url" class="form-input" id="img-modal-link" placeholder="https://yourwebsite.com (Optional)" style="font-size: 13px;" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeImageModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-insert-image-submit" onclick="submitInsertImage()">
+          Insert Image &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="/js/components/toasts.js?v=2"></script>
   <script src="/js/components/modal.js?v=2"></script>
   <script src="/js/api.js?v=2"></script>
   <script src="/js/views/dashboard.js?v=2"></script>
   <script src="/js/views/contacts.js?v=2"></script>
-  <script src="/js/views/templates.js?v=2"></script>
+  <script src="/js/views/templates.js?v=7"></script>
   <script src="/js/views/campaign.js?v=2"></script>
   <script src="/js/views/history.js?v=2"></script>
   <script src="/js/app.js?v=2"></script>
