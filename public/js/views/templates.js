@@ -460,6 +460,19 @@ function syncVisualToCode() {
   const visualEditor = document.getElementById('tpl-visual-editor');
   const codeEditor = document.getElementById('tpl-input-html');
   if (visualEditor && codeEditor) {
+    // Ensure all cropped/sized images have their exact aspect-ratio persisted for email clients
+    visualEditor.querySelectorAll('img').forEach(img => {
+      if (img.style.objectFit === 'cover' || (img.style.height && img.style.height !== 'auto')) {
+        const w = Math.round(parseFloat(img.style.width) || img.getBoundingClientRect().width);
+        const h = Math.round(parseFloat(img.style.height) || img.getBoundingClientRect().height);
+        if (w > 0 && h > 0) {
+          img.style.aspectRatio = `${w} / ${h}`;
+          if (!img.getAttribute('width')) img.setAttribute('width', w);
+          if (!img.getAttribute('height')) img.setAttribute('height', h);
+        }
+      }
+    });
+
     let cleanHtml = visualEditor.innerHTML;
     cleanHtml = cleanHtml.replace(/\s*class="selected-img"/g, '');
     codeEditor.value = cleanHtml;
@@ -609,7 +622,26 @@ function updateLivePreview() {
 
   // Perform client-side instant interpolation
   const renderedSubject = clientInterpolate(subject, sampleContact);
-  const renderedBody = clientInterpolate(content, sampleContact);
+  let renderedBody = clientInterpolate(content, sampleContact);
+
+  // Preserve identical crop frame aspect ratio and positioning across both Desktop and Mobile previews
+  renderedBody = renderedBody.replace(/<img\b([^>]*?)>/gi, (match, attrs) => {
+    if (/aspect-ratio\s*:/i.test(attrs)) return match;
+    const widthMatch = attrs.match(/style=["'][^"']*?\bwidth:\s*(\d+(?:\.\d+)?)(px)?/i) || attrs.match(/\bwidth=["']?(\d+)/i);
+    const heightMatch = attrs.match(/style=["'][^"']*?\bheight:\s*(\d+(?:\.\d+)?)(px)?/i) || attrs.match(/\bheight=["']?(\d+)/i);
+    if (widthMatch && heightMatch) {
+      const w = Math.round(parseFloat(widthMatch[1]));
+      const h = Math.round(parseFloat(heightMatch[1]));
+      if (w > 0 && h > 0) {
+        if (/style=["']/i.test(attrs)) {
+          return `<img ${attrs.replace(/style=(["'])/i, `style=$1aspect-ratio: ${w} / ${h}; `)}>`;
+        } else {
+          return `<img style="aspect-ratio: ${w} / ${h};" ${attrs}>`;
+        }
+      }
+    }
+    return match;
+  });
 
   // Update Envelope Subject and Recipient with crisp contrast
   const previewSubject = document.getElementById('preview-envelope-subject');
@@ -645,6 +677,13 @@ function updateLivePreview() {
           font-size: 15px;
           line-height: 1.65;
           word-break: break-word;
+        }
+        img {
+          max-width: 100%;
+        }
+        img[style*="object-fit"] {
+          max-width: 100%;
+          height: auto !important;
         }
         p { margin: 0 0 16px 0; }
         p:last-child { margin-bottom: 0; }
@@ -691,6 +730,7 @@ function setPreviewDevice(device) {
     desktopBtn.classList.add('active');
     mobileBtn.classList.remove('active');
   }
+  updateLivePreview();
 }
 
 async function saveTemplateFromStudio() {
@@ -771,10 +811,88 @@ function promptCustomVariableTag() {
  */
 let activeSelectedImage = null;
 let isResizingImage = false;
+let isPositioningImage = false;
 let selectedImageFile = null;
 let currentImageModalTab = 'upload';
 let imageSystemInitialized = false;
 let isAspectRatioLocked = false;
+
+/**
+ * Computes whether the image is cropped inside its frame under object-fit: cover,
+ * and the available excess pixels horizontally and vertically.
+ */
+function getImageCropData(img) {
+  if (!img) return null;
+  const natW = img.naturalWidth || parseFloat(img.getAttribute('width')) || img.clientWidth;
+  const natH = img.naturalHeight || parseFloat(img.getAttribute('height')) || img.clientHeight;
+  const rect = img.getBoundingClientRect();
+  const frameW = rect.width;
+  const frameH = rect.height;
+
+  if (!natW || !natH || frameW <= 0 || frameH <= 0) return null;
+
+  // Uniform scale factor under object-fit: cover
+  const scale = Math.max(frameW / natW, frameH / natH);
+  const renderedW = natW * scale;
+  const renderedH = natH * scale;
+
+  const excessX = Math.max(0, renderedW - frameW);
+  const excessY = Math.max(0, renderedH - frameH);
+  const isCropped = (excessX >= 1 || excessY >= 1);
+
+  return {
+    natW,
+    natH,
+    frameW,
+    frameH,
+    renderedW,
+    renderedH,
+    excessX,
+    excessY,
+    isCropped
+  };
+}
+
+/**
+ * Extracts current object-position coordinates (in percentages: 0 to 100)
+ */
+function getCurrentImageObjectPosition(img) {
+  const defaultPos = { x: 50, y: 50 };
+  if (!img) return defaultPos;
+
+  const raw = (img.style.objectPosition || '').trim();
+  if (!raw) return defaultPos;
+
+  const parts = raw.split(/\s+/);
+  if (parts.length === 0) return defaultPos;
+
+  function parsePart(part, axis) {
+    if (!part) return 50;
+    const lower = part.toLowerCase();
+    if (lower === 'center') return 50;
+    if (lower === 'left' || lower === 'top') return 0;
+    if (lower === 'right' || lower === 'bottom') return 100;
+    if (lower.endsWith('%')) {
+      const num = parseFloat(lower);
+      return isNaN(num) ? 50 : Math.max(0, Math.min(100, num));
+    }
+    if (lower.endsWith('px')) {
+      const px = parseFloat(lower);
+      const crop = getImageCropData(img);
+      const excess = crop ? (axis === 'x' ? crop.excessX : crop.excessY) : 0;
+      if (excess > 0) {
+        return Math.max(0, Math.min(100, (-px / excess) * 100));
+      }
+      return 50;
+    }
+    const num = parseFloat(lower);
+    return isNaN(num) ? 50 : Math.max(0, Math.min(100, num));
+  }
+
+  const posX = parsePart(parts[0], 'x');
+  const posY = parts.length > 1 ? parsePart(parts[1], 'y') : 50;
+  return { x: posX, y: posY };
+}
 
 function openImageModal() {
   saveVisualEditorCaret();
@@ -1027,11 +1145,17 @@ function selectImageForResize(img) {
 function deselectImage() {
   if (activeSelectedImage) {
     activeSelectedImage.classList.remove('selected-img');
+    activeSelectedImage.style.cursor = '';
     activeSelectedImage = null;
   }
+  isPositioningImage = false;
+  document.body.style.cursor = '';
   const overlay = document.getElementById('image-resizer-overlay');
   if (overlay) {
     overlay.style.display = 'none';
+    overlay.classList.remove('is-cropped', 'is-positioning');
+    overlay.style.pointerEvents = 'none';
+    overlay.removeAttribute('title');
   }
 }
 
@@ -1059,6 +1183,22 @@ function updateResizerOverlayPosition() {
   const badge = document.getElementById('image-dimension-badge');
   if (badge) {
     badge.textContent = `${Math.round(imgRect.width)} × ${Math.round(imgRect.height)} px`;
+  }
+
+  // Update in-frame position dragging state & cursor
+  const crop = getImageCropData(activeSelectedImage);
+  if (crop && crop.isCropped) {
+    overlay.classList.add('is-cropped');
+    overlay.style.pointerEvents = 'auto';
+    overlay.style.cursor = isPositioningImage ? 'grabbing' : 'grab';
+    overlay.setAttribute('title', 'Drag to reposition image inside frame');
+  } else {
+    overlay.classList.remove('is-cropped');
+    if (!isPositioningImage) {
+      overlay.style.pointerEvents = 'none';
+      overlay.style.cursor = 'default';
+      overlay.removeAttribute('title');
+    }
   }
 }
 
@@ -1154,6 +1294,11 @@ function setImagePixelWidth(val) {
   activeSelectedImage.style.maxWidth = '100%';
   activeSelectedImage.setAttribute('width', px);
 
+  const curH = parseFloat(activeSelectedImage.style.height) || (activeSelectedImage.style.objectFit === 'cover' ? activeSelectedImage.getBoundingClientRect().height : 0);
+  if (curH > 0 && px > 0) {
+    activeSelectedImage.style.aspectRatio = `${px} / ${Math.round(curH)}`;
+  }
+
   updateResizerOverlayPosition();
   updateFloatingToolbarValues();
   syncVisualToCode();
@@ -1169,6 +1314,11 @@ function setImagePixelHeight(val) {
   activeSelectedImage.setAttribute('height', px);
   activeSelectedImage.style.objectFit = 'cover';
 
+  const curW = parseFloat(activeSelectedImage.style.width) || activeSelectedImage.getBoundingClientRect().width;
+  if (curW > 0 && px > 0) {
+    activeSelectedImage.style.aspectRatio = `${Math.round(curW)} / ${px}`;
+  }
+
   updateResizerOverlayPosition();
   updateFloatingToolbarValues();
   syncVisualToCode();
@@ -1181,6 +1331,8 @@ function resetImageHeightAuto() {
   activeSelectedImage.style.height = 'auto';
   activeSelectedImage.removeAttribute('height');
   activeSelectedImage.style.objectFit = '';
+  activeSelectedImage.style.objectPosition = '';
+  activeSelectedImage.style.aspectRatio = '';
 
   updateResizerOverlayPosition();
   updateFloatingToolbarValues();
@@ -1389,6 +1541,9 @@ function setupImageDragResizing() {
           }
         }
 
+        if (newWidth > 0 && newHeight > 0) {
+          activeSelectedImage.style.aspectRatio = `${Math.round(newWidth)} / ${Math.round(newHeight)}`;
+        }
         activeSelectedImage.style.maxWidth = '100%';
         updateResizerOverlayPosition();
 
@@ -1413,6 +1568,166 @@ function setupImageDragResizing() {
       document.addEventListener('mouseup', onMouseUp);
     });
   });
+}
+
+function setupImagePositionDragging() {
+  const overlay = document.getElementById('image-resizer-overlay');
+  const visualEditor = document.getElementById('tpl-visual-editor');
+
+  function startDragSession(e, targetImg) {
+    if (isResizingImage) return;
+
+    // Do not initiate reposition drag if clicking a resize handle or floating toolbar
+    if (e.target && (e.target.closest('.resizer-handle') || e.target.closest('.image-floating-toolbar'))) {
+      return;
+    }
+
+    const img = targetImg || activeSelectedImage;
+    if (!img) return;
+
+    const crop = getImageCropData(img);
+    if (!crop || !crop.isCropped) return;
+
+    // Ensure image is selected
+    if (activeSelectedImage !== img) {
+      selectImageForResize(img);
+    }
+
+    // Ensure object-fit: cover is applied so frame remains fixed & image stays clipped
+    img.style.objectFit = 'cover';
+
+    isPositioningImage = true;
+    const isTouch = !!(e.touches && e.touches.length);
+    const startX = isTouch ? e.touches[0].clientX : e.clientX;
+    const startY = isTouch ? e.touches[0].clientY : e.clientY;
+    const startPos = getCurrentImageObjectPosition(img);
+    let hasMoved = false;
+    const moveThreshold = 2; // px
+
+    if (e.cancelable) e.preventDefault();
+
+    document.body.style.cursor = 'grabbing';
+    if (overlay) {
+      overlay.classList.add('is-positioning');
+      overlay.style.cursor = 'grabbing';
+    }
+    img.style.cursor = 'grabbing';
+
+    const onMove = (moveEvt) => {
+      if (!isPositioningImage || !activeSelectedImage) return;
+
+      const moveIsTouch = !!(moveEvt.touches && moveEvt.touches.length);
+      const currentX = moveIsTouch ? moveEvt.touches[0].clientX : moveEvt.clientX;
+      const currentY = moveIsTouch ? moveEvt.touches[0].clientY : moveEvt.clientY;
+      if (currentX === undefined || currentY === undefined) return;
+
+      const deltaX = currentX - startX;
+      const deltaY = currentY - startY;
+
+      if (!hasMoved) {
+        if (Math.hypot(deltaX, deltaY) >= moveThreshold) {
+          hasMoved = true;
+        } else {
+          return;
+        }
+      }
+
+      if (moveEvt.cancelable) moveEvt.preventDefault();
+
+      let newPosX = startPos.x;
+      let newPosY = startPos.y;
+
+      // Allow movement horizontally according to available cropped area
+      if (crop.excessX >= 1) {
+        newPosX = startPos.x - (deltaX / crop.excessX) * 100;
+        newPosX = Math.max(0, Math.min(100, newPosX));
+      }
+
+      // Allow movement vertically according to available cropped area
+      if (crop.excessY >= 1) {
+        newPosY = startPos.y - (deltaY / crop.excessY) * 100;
+        newPosY = Math.max(0, Math.min(100, newPosY));
+      }
+
+      const roundX = Math.round(newPosX * 10) / 10;
+      const roundY = Math.round(newPosY * 10) / 10;
+      activeSelectedImage.style.objectPosition = `${roundX}% ${roundY}%`;
+
+      updateLivePreview();
+    };
+
+    const onEnd = () => {
+      if (!isPositioningImage) return;
+      isPositioningImage = false;
+
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+      document.removeEventListener('touchcancel', onEnd);
+
+      document.body.style.cursor = '';
+      if (overlay) {
+        overlay.classList.remove('is-positioning');
+      }
+      if (activeSelectedImage) {
+        activeSelectedImage.style.cursor = '';
+        const currentCrop = getImageCropData(activeSelectedImage);
+        if (overlay) {
+          overlay.style.cursor = (currentCrop && currentCrop.isCropped) ? 'grab' : 'default';
+        }
+      }
+
+      if (hasMoved) {
+        syncVisualToCode();
+        updateLivePreview();
+      }
+    };
+
+    document.addEventListener('mousemove', onMove, { passive: false });
+    document.addEventListener('mouseup', onEnd);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+    document.addEventListener('touchcancel', onEnd);
+  }
+
+  // 1. Listen on overlay for mouse and touch interactions
+  if (overlay) {
+    overlay.addEventListener('mousedown', (e) => {
+      startDragSession(e, activeSelectedImage);
+    });
+    overlay.addEventListener('touchstart', (e) => {
+      startDragSession(e, activeSelectedImage);
+    }, { passive: false });
+  }
+
+  // 2. Listen on visual editor canvas (for direct clicks/touches on IMG elements)
+  if (visualEditor) {
+    visualEditor.addEventListener('mousedown', (e) => {
+      if (e.target && e.target.tagName === 'IMG') {
+        const crop = getImageCropData(e.target);
+        if (crop && crop.isCropped) {
+          startDragSession(e, e.target);
+        }
+      }
+    });
+
+    visualEditor.addEventListener('touchstart', (e) => {
+      if (e.target && e.target.tagName === 'IMG') {
+        const crop = getImageCropData(e.target);
+        if (crop && crop.isCropped) {
+          startDragSession(e, e.target);
+        }
+      }
+    }, { passive: false });
+
+    // Prevent default browser ghost-image drag
+    visualEditor.addEventListener('dragstart', (e) => {
+      if (e.target && e.target.tagName === 'IMG') {
+        e.preventDefault();
+      }
+    });
+  }
 }
 
 function initImageResizerSystem() {
@@ -1505,6 +1820,7 @@ function initImageResizerSystem() {
   });
 
   setupImageDragResizing();
+  setupImagePositionDragging();
 
   const modalDropzone = document.getElementById('img-upload-dropzone');
   if (modalDropzone) {
@@ -1562,4 +1878,7 @@ window.promptImageLink = promptImageLink;
 window.deleteSelectedImage = deleteSelectedImage;
 window.deselectImage = deselectImage;
 window.initImageResizerSystem = initImageResizerSystem;
+window.setupImagePositionDragging = setupImagePositionDragging;
+window.getImageCropData = getImageCropData;
+window.getCurrentImageObjectPosition = getCurrentImageObjectPosition;
 

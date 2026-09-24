@@ -786,6 +786,8 @@
 .visual-editor-canvas img.selected-img {
   outline: 2px solid #f97316 !important;
   outline-offset: 2px;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* Image Resizer Overlay Box */
@@ -797,6 +799,15 @@
   box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.3), 0 6px 20px rgba(249, 115, 22, 0.18);
   z-index: 80;
   box-sizing: border-box;
+}
+
+.image-resizer-overlay.is-cropped {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.image-resizer-overlay.is-positioning {
+  cursor: grabbing !important;
 }
 
 /* Drag Handles */
