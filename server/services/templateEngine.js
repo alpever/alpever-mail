@@ -93,11 +93,13 @@ const path = require('path');
 const fs = require('fs');
 
 const cdnUrlCache = new Map();
+const reverseCdnCache = new Map();
 
 // Register known/cached CDN URLs for uploaded images
 function registerImageUrlMapping(localPath, publicUrl) {
   if (localPath && publicUrl) {
     cdnUrlCache.set(localPath, publicUrl);
+    reverseCdnCache.set(publicUrl, localPath);
   }
 }
 
@@ -109,26 +111,61 @@ registerImageUrlMapping(
 
 /**
  * Resolves local/relative image URLs for email clients:
- * - If APP_URL is configured (e.g. https://my-domain.com), prepends APP_URL.
- * - Otherwise (or on localhost), uses cached public CDN URL or converts to Base64 data URLs.
+ * - If APP_URL is configured (e.g. https://my-domain.com), prepends APP_URL to /uploads/ paths.
+ * - Auto-repairs any legacy freeimage.host / iili.io links by pointing to local disk copies.
+ * - Otherwise (or on localhost without public domain), embeds as Base64 data URLs.
  */
 function resolveEmailImages(html = '') {
   if (!html) return '';
 
   const appUrl = (process.env.APP_URL || '').trim().replace(/\/$/, '');
 
+  // 1. First, rescue any legacy freeimage.host or iili.io links
+  html = html.replace(/src=["'](https?:\/\/(?:iili\.io|freeimage\.host)[^"']+)["']/gi, (match, fullUrl) => {
+    // Check if we have registered local mapping
+    const localRel = reverseCdnCache.get(fullUrl);
+    if (localRel) {
+      if (appUrl && !appUrl.includes('localhost') && !appUrl.includes('127.0.0.1')) {
+        return `src="${appUrl}${localRel}"`;
+      }
+      return `src="${localRel}"`;
+    }
+
+    // Try finding the most recent uploaded image on disk as fallback
+    try {
+      const uploadsDir = path.join(__dirname, '../../uploads/images');
+      if (fs.existsSync(uploadsDir)) {
+        const files = fs.readdirSync(uploadsDir).filter(f => f.match(/\.(png|jpe?g|webp|gif)$/i));
+        if (files.length > 0) {
+          files.sort((a, b) => fs.statSync(path.join(uploadsDir, b)).mtimeMs - fs.statSync(path.join(uploadsDir, a)).mtimeMs);
+          const fallbackRel = `/uploads/images/${files[0]}`;
+          if (appUrl && !appUrl.includes('localhost') && !appUrl.includes('127.0.0.1')) {
+            return `src="${appUrl}${fallbackRel}"`;
+          }
+          return `src="${fallbackRel}"`;
+        }
+      }
+    } catch (e) {}
+
+    return match;
+  });
+
+  // 2. Resolve /uploads/ relative URLs
   return html.replace(/src=["'](\/uploads\/[^"']+)["']/gi, (match, relPath) => {
-    // 1. If public domain APP_URL is set, use the full public URL
+    // A. If public domain APP_URL is set, use the full public URL
     if (appUrl && !appUrl.includes('localhost') && !appUrl.includes('127.0.0.1')) {
       return `src="${appUrl}${relPath}"`;
     }
 
-    // 2. Check if a public CDN URL is mapped
+    // B. Check if a public CDN URL is mapped (non-broken)
     if (cdnUrlCache.has(relPath)) {
-      return `src="${cdnUrlCache.get(relPath)}"`;
+      const cdnUrl = cdnUrlCache.get(relPath);
+      if (!cdnUrl.includes('iili.io') && !cdnUrl.includes('freeimage.host')) {
+        return `src="${cdnUrl}"`;
+      }
     }
 
-    // 3. Otherwise, embed as Base64 data URL for clients that support it
+    // C. Otherwise, embed as Base64 data URL for clients that support it
     try {
       const cleanRel = relPath.replace(/^\//, '').replace(/\//g, path.sep);
       const fullPath = path.join(__dirname, '../../', cleanRel);

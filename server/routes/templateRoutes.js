@@ -169,7 +169,7 @@ router.post('/preview', async (req, res) => {
   }
 });
 
-// POST /api/templates/upload-image - Upload an image for templates
+// POST /api/templates/upload-image - Upload an image for templates (Local uploads folder + direct server hosting)
 router.post('/upload-image', (req, res) => {
   uploadImage.single('image')(req, res, async (err) => {
     if (err) {
@@ -179,43 +179,19 @@ router.post('/upload-image', (req, res) => {
       return res.status(400).json({ error: 'No image file provided' });
     }
 
+    // Always use local /uploads/images/<filename> path
     const localUrl = `/uploads/images/${req.file.filename}`;
-    let publicUrl = localUrl;
-
     const appUrl = (process.env.APP_URL || '').trim().replace(/\/$/, '');
-    if (appUrl && !appUrl.includes('localhost') && !appUrl.includes('127.0.0.1')) {
-      // Production deployed domain
-      publicUrl = `${appUrl}${localUrl}`;
-    } else {
-      // Local dev / testing: auto-upload to global CDN so Gmail proxy renders the image!
-      try {
-        const fileBuf = fs.readFileSync(req.file.path);
-        const b64 = fileBuf.toString('base64');
-        const form = new FormData();
-        form.append('key', '6d207e02198a847aa98d0a2a901485a5');
-        form.append('action', 'upload');
-        form.append('source', b64);
-        form.append('format', 'json');
-
-        const cdnRes = await fetch('https://freeimage.host/api/1/upload', {
-          method: 'POST',
-          body: form,
-          signal: AbortSignal.timeout(8000)
-        });
-        const cdnData = await cdnRes.json();
-        if (cdnData && cdnData.image && cdnData.image.url) {
-          publicUrl = cdnData.image.url;
-        }
-      } catch (cdnErr) {
-        console.warn('CDN sync failed, using local URL:', cdnErr.message);
-      }
-    }
+    const publicUrl = (appUrl && !appUrl.includes('localhost') && !appUrl.includes('127.0.0.1'))
+      ? `${appUrl}${localUrl}`
+      : localUrl;
 
     registerImageUrlMapping(localUrl, publicUrl);
 
     res.json({
       success: true,
-      url: publicUrl,
+      url: localUrl,
+      publicUrl,
       localUrl,
       filename: req.file.originalname,
       size: req.file.size,

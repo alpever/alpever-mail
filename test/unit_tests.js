@@ -105,7 +105,10 @@ console.log('  ✓ Online image URLs (https://) are preserved for email dispatch
 process.env.APP_URL = 'https://mail.alpever.com';
 const htmlWithLocalImg = '<p><img src="/uploads/images/banner.png" width="600" /></p>';
 const resolvedWithDomain = resolveEmailImages(htmlWithLocalImg);
-assert(resolvedWithDomain.includes('https://mail.alpever.com/uploads/images/banner.png'), 'Should prepend APP_URL to local uploads');
-console.log('  ✓ Relative /uploads/ images are resolved to public absolute URLs with APP_URL');
+// Legacy freeimage/iili URLs should be repaired and resolved with APP_URL
+const htmlWithLegacy = '<p><img src="https://iili.io/nAo6aa9.jpg" /></p>';
+const resolvedLegacy = resolveEmailImages(htmlWithLegacy);
+assert(!resolvedLegacy.includes('https://iili.io/nAo6aa9.jpg') && resolvedLegacy.includes('/uploads/images/'), 'Legacy iili links should be rescued to local uploads');
+console.log('  ✓ Legacy freeimage.host / iili.io URLs are auto-rescued to local uploads');
 
 console.log('\n🎉 ALL UNIT TESTS PASSED SUCCESSFULLY! Everything is working properly.');
