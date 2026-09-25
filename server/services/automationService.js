@@ -161,28 +161,48 @@ async function runAutomationBatch(automationId, { isManual = false } = {}) {
 }
 
 /**
- * Returns today's date in YYYY-MM-DD format (local/IST)
+ * Returns today's date in YYYY-MM-DD format (IST / Indian Standard Time by default)
  */
-function getTodayDateString() {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function getTodayDateString(timeZone = process.env.TIMEZONE || 'Asia/Kolkata') {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return formatter.format(new Date());
+  } catch (e) {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 }
 
 /**
- * Returns current local time in HH:MM format
+ * Returns current time in HH:MM format (IST / Indian Standard Time by default)
  */
-function getCurrentTimeString() {
-  const d = new Date();
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
+function getCurrentTimeString(timeZone = process.env.TIMEZONE || 'Asia/Kolkata') {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    return formatter.format(new Date());
+  } catch (e) {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
 }
 
 /**
- * Background tick: checks if any active automations match the current time
+ * Background tick: checks if any active automations are due to run
  */
 async function checkAndRunScheduledAutomations() {
   if (isSchedulerRunning) return;
@@ -198,17 +218,17 @@ async function checkAndRunScheduledAutomations() {
     const currentHM = getCurrentTimeString();
     const todayStr = getTodayDateString();
 
-    // Find active automations scheduled for this exact minute that haven't run today
+    // Find active automations whose scheduled time for today has arrived and haven't run today
     const [dueAutomations] = await pool.query(`
       SELECT id, name, send_time, daily_limit, last_run_date
       FROM automations
       WHERE status = 'active'
-        AND send_time = ?
+        AND send_time <= ?
         AND (last_run_date IS NULL OR last_run_date != ?)
     `, [currentHM, todayStr]);
 
     if (dueAutomations.length) {
-      console.log(`⏰ [Automation Scheduler] Found ${dueAutomations.length} automation(s) scheduled for ${currentHM}:`, dueAutomations.map(a => a.name));
+      console.log(`⏰ [Automation Scheduler (${currentHM} IST)] Found ${dueAutomations.length} automation(s) due:`, dueAutomations.map(a => a.name));
 
       for (const auto of dueAutomations) {
         try {
