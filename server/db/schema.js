@@ -34,6 +34,8 @@ async function runMigrations(pool) {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_list_id (list_id),
       INDEX idx_email (email),
+      INDEX idx_contacts_created (created_at),
+      INDEX idx_contacts_list_status (list_id, status),
       CONSTRAINT fk_contacts_list FOREIGN KEY (list_id) REFERENCES contact_lists(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 
@@ -46,7 +48,8 @@ async function runMigrations(pool) {
       body_text LONGTEXT,
       variables JSON,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_templates_updated (updated_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
 
     // 5. Campaigns
@@ -62,10 +65,14 @@ async function runMigrations(pool) {
       total_count INT DEFAULT 0,
       sent_count INT DEFAULT 0,
       failed_count INT DEFAULT 0,
+      opened_count INT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       started_at TIMESTAMP NULL,
       finished_at TIMESTAMP NULL,
       INDEX idx_camp_status (status),
+      INDEX idx_camp_created (created_at),
+      INDEX idx_camp_started (started_at),
+      INDEX idx_camp_status_created (status, created_at),
       CONSTRAINT fk_camp_template FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE CASCADE,
       CONSTRAINT fk_camp_list FOREIGN KEY (list_id) REFERENCES contact_lists(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
@@ -88,6 +95,9 @@ async function runMigrations(pool) {
       INDEX idx_log_campaign (campaign_id),
       INDEX idx_log_status (status),
       INDEX idx_log_opened (opened_at),
+      INDEX idx_cl_sent_at (sent_at),
+      INDEX idx_cl_camp_status (campaign_id, status),
+      INDEX idx_cl_camp_opened (campaign_id, opened_at),
       CONSTRAINT fk_log_campaign FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
   ];
@@ -102,14 +112,25 @@ async function runMigrations(pool) {
     'ALTER TABLE campaign_logs ADD COLUMN open_count INT DEFAULT 0',
     'ALTER TABLE campaign_logs ADD COLUMN user_agent VARCHAR(500) NULL',
     'ALTER TABLE campaign_logs ADD COLUMN ip_address VARCHAR(100) NULL',
-    'ALTER TABLE campaigns ADD COLUMN opened_count INT DEFAULT 0'
+    'ALTER TABLE campaigns ADD COLUMN opened_count INT DEFAULT 0',
+    // Performance indexes for ultra-fast query execution
+    'CREATE INDEX idx_camp_created ON campaigns (created_at)',
+    'CREATE INDEX idx_camp_started ON campaigns (started_at)',
+    'CREATE INDEX idx_camp_status_created ON campaigns (status, created_at)',
+    'CREATE INDEX idx_cl_sent_at ON campaign_logs (sent_at)',
+    'CREATE INDEX idx_cl_opened_at ON campaign_logs (opened_at)',
+    'CREATE INDEX idx_cl_camp_status ON campaign_logs (campaign_id, status)',
+    'CREATE INDEX idx_cl_camp_opened ON campaign_logs (campaign_id, opened_at)',
+    'CREATE INDEX idx_contacts_created ON contacts (created_at)',
+    'CREATE INDEX idx_contacts_list_status ON contacts (list_id, status)',
+    'CREATE INDEX idx_templates_updated ON templates (updated_at)'
   ];
 
   for (const altQ of alterMigrations) {
     try {
       await pool.query(altQ);
     } catch (e) {
-      // Column already exists - safely ignore
+      // Column or index already exists - safely ignore
     }
   }
 

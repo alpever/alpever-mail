@@ -12,21 +12,64 @@ const {
   cancelCampaign
 } = require('../services/queueService');
 
-// GET /api/campaigns - List all campaigns
+// GET /api/campaigns - List campaigns with optional pagination, search, and status filter
 router.get('/', async (req, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not connected' });
 
+  const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+  const page = Math.max(1, parseInt(req.query.page || '1', 10));
+  const limit = Math.max(1, parseInt(req.query.limit || '10', 10));
+  const offset = (page - 1) * limit;
+  const search = (req.query.search || '').trim();
+  const statusFilter = (req.query.status || '').trim();
+
   try {
-    const [rows] = await pool.query(`
+    let countQuery = 'SELECT COUNT(*) as total FROM campaigns c';
+    let dataQuery = `
       SELECT c.*, 
         t.name as template_name,
         l.name as list_name
       FROM campaigns c
       LEFT JOIN templates t ON c.template_id = t.id
       LEFT JOIN contact_lists l ON c.list_id = l.id
-      ORDER BY c.created_at DESC
-    `);
+    `;
+
+    const conditions = [];
+    const params = [];
+    const countParams = [];
+
+    if (search) {
+      conditions.push('(c.name LIKE ? OR c.from_name LIKE ? OR c.from_email LIKE ?)');
+      const sp = `%${search}%`;
+      countParams.push(sp, sp, sp);
+      params.push(sp, sp, sp);
+    }
+
+    if (statusFilter && statusFilter !== 'all') {
+      conditions.push('c.status = ?');
+      countParams.push(statusFilter);
+      params.push(statusFilter);
+    }
+
+    if (conditions.length) {
+      const whereClause = ' WHERE ' + conditions.join(' AND ');
+      countQuery += whereClause;
+      dataQuery += whereClause;
+    }
+
+    let total = 0;
+    if (hasPagination) {
+      const [countResult] = await pool.query(countQuery, countParams);
+      total = countResult[0].total;
+
+      dataQuery += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
+      params.push(limit, offset);
+    } else {
+      dataQuery += ' ORDER BY c.created_at DESC';
+    }
+
+    const [rows] = await pool.query(dataQuery, params);
 
     // Check if any is currently running in memory
     const enriched = rows.map(camp => {
@@ -49,7 +92,17 @@ router.get('/', async (req, res) => {
       };
     });
 
-    res.json(enriched);
+    if (hasPagination) {
+      res.json({
+        campaigns: enriched,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1
+      });
+    } else {
+      res.json(enriched);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

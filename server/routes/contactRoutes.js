@@ -25,19 +25,56 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 } // 25MB max
 });
 
-// GET /api/contacts/lists - Get all lists
+// GET /api/contacts/lists - Get lists with optional pagination and search
 router.get('/lists', async (req, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'Database not connected' });
 
+  const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+  const page = Math.max(1, parseInt(req.query.page || '1', 10));
+  const limit = Math.max(1, parseInt(req.query.limit || '12', 10));
+  const offset = (page - 1) * limit;
+  const search = (req.query.search || '').trim();
+
   try {
-    const [rows] = await pool.query(`
+    let countQuery = 'SELECT COUNT(*) as total FROM contact_lists l';
+    let dataQuery = `
       SELECT l.*, 
         (SELECT COUNT(*) FROM contacts c WHERE c.list_id = l.id) as total_contacts
-      FROM contact_lists l 
-      ORDER BY l.created_at DESC
-    `);
-    res.json(rows);
+      FROM contact_lists l
+    `;
+    const params = [];
+    const countParams = [];
+
+    if (search) {
+      const searchPattern = `%${search}%`;
+      countQuery += ' WHERE l.name LIKE ? OR l.description LIKE ?';
+      dataQuery += ' WHERE l.name LIKE ? OR l.description LIKE ?';
+      countParams.push(searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern);
+    }
+
+    if (hasPagination) {
+      const [countResult] = await pool.query(countQuery, countParams);
+      const total = countResult[0].total;
+
+      dataQuery += ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?';
+      params.push(limit, offset);
+
+      const [rows] = await pool.query(dataQuery, params);
+
+      return res.json({
+        lists: rows,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1
+      });
+    } else {
+      dataQuery += ' ORDER BY l.created_at DESC';
+      const [rows] = await pool.query(dataQuery, params);
+      return res.json(rows);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

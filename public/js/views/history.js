@@ -121,24 +121,20 @@ async function loadCampaignLogsTable() {
       `;
     }).join('');
 
-    // Pagination
-    pagination.innerHTML = `
-      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 14px;">
-        <span style="font-size: 12px; color: var(--text-muted);">
-          Page ${data.page} of ${data.totalPages || 1} (${data.total} logs)
-        </span>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-secondary btn-sm" ${data.page <= 1 ? 'disabled' : ''} onclick="changeLogsPage(${data.page - 1})">
-            Previous
-          </button>
-          <button class="btn btn-secondary btn-sm" ${data.page >= data.totalPages ? 'disabled' : ''} onclick="changeLogsPage(${data.page + 1})">
-            Next
-          </button>
-        </div>
-      </div>
-    `;
+    // Render modern pagination
+    if (window.renderPaginationControls && pagination) {
+      window.renderPaginationControls({
+        containerId: 'history-logs-pagination',
+        currentPage: data.page,
+        totalPages: data.totalPages,
+        totalItems: data.total,
+        limit: data.limit,
+        onPageChangeName: 'changeLogsPage',
+        itemName: 'recipient logs'
+      });
+    }
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color: var(--color-danger); padding: 20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="color: var(--color-danger); padding: 20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 

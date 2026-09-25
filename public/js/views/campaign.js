@@ -16,25 +16,77 @@ let wizardPreviewIndex = 0;
 let wizardFinalListId = null;
 let wizardFinalListCount = 0;
 
+let currentCampaignsPage = 1;
+let currentCampaignsLimit = 10;
+let currentCampaignsSearch = '';
+let currentCampaignsStatus = 'all';
+let campaignsSearchDebounceTimer = null;
+
 async function loadCampaignsView() {
   await loadCampaignsList();
   await populateWizardDropdowns();
 }
 
+function handleCampaignSearch(val) {
+  clearTimeout(campaignsSearchDebounceTimer);
+  campaignsSearchDebounceTimer = setTimeout(() => {
+    currentCampaignsSearch = (val || '').trim();
+    currentCampaignsPage = 1;
+    loadCampaignsList();
+  }, 300);
+}
+
+function handleCampaignStatusFilter(status) {
+  currentCampaignsStatus = status || 'all';
+  currentCampaignsPage = 1;
+  loadCampaignsList();
+}
+
+function handleCampaignLimitChange(limit) {
+  currentCampaignsLimit = parseInt(limit, 10) || 10;
+  currentCampaignsPage = 1;
+  loadCampaignsList();
+}
+
+function goToCampaignsPage(page) {
+  currentCampaignsPage = page;
+  loadCampaignsList();
+}
+
 async function loadCampaignsList() {
   const container = document.getElementById('campaigns-table-tbody');
+  const paginationContainer = document.getElementById('campaigns-pagination');
   if (!container) return;
 
+  container.innerHTML = `
+    <tr>
+      <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+        Loading campaigns...
+      </td>
+    </tr>
+  `;
+
   try {
-    const campaigns = await api.get('/campaigns');
+    let url = `/campaigns?page=${currentCampaignsPage}&limit=${currentCampaignsLimit}`;
+    if (currentCampaignsSearch) url += `&search=${encodeURIComponent(currentCampaignsSearch)}`;
+    if (currentCampaignsStatus && currentCampaignsStatus !== 'all') url += `&status=${encodeURIComponent(currentCampaignsStatus)}`;
+
+    const res = await api.get(url);
+    const campaigns = Array.isArray(res) ? res : (res.campaigns || []);
+    const total = Array.isArray(res) ? campaigns.length : (res.total || 0);
+    const totalPages = Array.isArray(res) ? 1 : (res.totalPages || 1);
+
     if (!campaigns.length) {
       container.innerHTML = `
         <tr>
-          <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 40px;">
-            No campaigns launched yet. Click <strong>"Create New Campaign"</strong> to get started!
+          <td colspan="8" style="text-align: center; color: var(--text-dim); padding: 40px;">
+            ${currentCampaignsSearch || currentCampaignsStatus !== 'all' 
+              ? 'No campaigns match your search/filter criteria.' 
+              : 'No campaigns launched yet. Click <strong>"Launch New Campaign"</strong> to get started!'}
           </td>
         </tr>
       `;
+      if (paginationContainer) paginationContainer.innerHTML = '';
       return;
     }
 
@@ -96,8 +148,21 @@ async function loadCampaignsList() {
         </tr>
       `;
     }).join('');
+
+    // Render modern pagination
+    if (window.renderPaginationControls && paginationContainer) {
+      window.renderPaginationControls({
+        containerId: 'campaigns-pagination',
+        currentPage: currentCampaignsPage,
+        totalPages,
+        totalItems: total,
+        limit: currentCampaignsLimit,
+        onPageChangeName: 'goToCampaignsPage',
+        itemName: 'campaigns'
+      });
+    }
   } catch (err) {
-    container.innerHTML = `<tr><td colspan="7" style="color: var(--color-danger); padding: 20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+    container.innerHTML = `<tr><td colspan="8" style="color: var(--color-danger); padding: 20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -892,6 +957,10 @@ async function cancelActiveCampaign() {
 }
 
 window.loadCampaignsView = loadCampaignsView;
+window.handleCampaignSearch = handleCampaignSearch;
+window.handleCampaignStatusFilter = handleCampaignStatusFilter;
+window.handleCampaignLimitChange = handleCampaignLimitChange;
+window.goToCampaignsPage = goToCampaignsPage;
 window.openCreateCampaignModal = openCreateCampaignModal;
 window.setWizardStep = setWizardStep;
 window.switchAudienceSource = switchAudienceSource;

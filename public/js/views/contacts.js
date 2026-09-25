@@ -2,33 +2,70 @@
  * Contacts & Audience View Controller
  */
 
+let currentAudiencePage = 1;
+let currentAudienceLimit = 12;
+let currentAudienceSearch = '';
+let audienceSearchDebounceTimer = null;
+
 let currentViewingListId = null;
+let currentViewingListName = '';
 let currentContactsPage = 1;
+let currentContactsLimit = 20;
 
 async function loadContactsView() {
   await loadAudienceLists();
   setupDropzone();
 }
 
+function handleAudienceSearch(val) {
+  clearTimeout(audienceSearchDebounceTimer);
+  audienceSearchDebounceTimer = setTimeout(() => {
+    currentAudienceSearch = (val || '').trim();
+    currentAudiencePage = 1;
+    loadAudienceLists();
+  }, 300);
+}
+
+function handleAudienceLimitChange(val) {
+  currentAudienceLimit = parseInt(val, 10) || 12;
+  currentAudiencePage = 1;
+  loadAudienceLists();
+}
+
+function goToAudiencePage(page) {
+  currentAudiencePage = page;
+  loadAudienceLists();
+}
+
 async function loadAudienceLists() {
   const container = document.getElementById('audience-lists-grid');
+  const paginationContainer = document.getElementById('audience-lists-pagination');
   if (!container) return;
 
+  container.innerHTML = `<div style="grid-column: 1 / -1; padding: 30px; text-align: center; color: var(--text-muted);">Loading audience lists...</div>`;
+
   try {
-    const lists = await api.get('/contacts/lists');
+    const res = await api.get(`/contacts/lists?page=${currentAudiencePage}&limit=${currentAudienceLimit}&search=${encodeURIComponent(currentAudienceSearch)}`);
+    const lists = Array.isArray(res) ? res : (res.lists || []);
+    const total = Array.isArray(res) ? lists.length : (res.total || 0);
+    const totalPages = Array.isArray(res) ? 1 : (res.totalPages || 1);
+
     if (!lists.length) {
       container.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-muted); background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--border-subtle);">
           <div style="font-size: 32px; margin-bottom: 12px;">📂</div>
-          <h3 style="font-size: 16px; color: var(--text-main); margin-bottom: 6px;">No Audience Lists Found</h3>
+          <h3 style="font-size: 16px; color: var(--text-main); margin-bottom: 6px;">${currentAudienceSearch ? 'No Matching Audience Lists' : 'No Audience Lists Found'}</h3>
           <p style="font-size: 13px; color: var(--text-dim); max-width: 450px; margin: 0 auto 16px;">
-            Upload your first customer CSV/Excel file or generate a sample customer list to test personalized sending.
+            ${currentAudienceSearch ? 'Try searching with a different keyword or clear the search input.' : 'Upload your first customer CSV/Excel file or generate a sample customer list to test personalized sending.'}
           </p>
-          <button class="btn btn-primary btn-sm" onclick="downloadSampleCSV()">
-            📥 Download Sample 10-Customer CSV
-          </button>
+          ${!currentAudienceSearch ? `
+            <button class="btn btn-primary btn-sm" onclick="downloadSampleCSV()">
+              📥 Download Sample 10-Customer CSV
+            </button>
+          ` : ''}
         </div>
       `;
+      if (paginationContainer) paginationContainer.innerHTML = '';
       return;
     }
 
@@ -61,6 +98,19 @@ async function loadAudienceLists() {
         </div>
       </div>
     `).join('');
+
+    // Render modern pagination
+    if (window.renderPaginationControls && paginationContainer) {
+      window.renderPaginationControls({
+        containerId: 'audience-lists-pagination',
+        currentPage: currentAudiencePage,
+        totalPages,
+        totalItems: total,
+        limit: currentAudienceLimit,
+        onPageChangeName: 'goToAudiencePage',
+        itemName: 'audience lists'
+      });
+    }
   } catch (err) {
     container.innerHTML = `<div style="color: var(--color-danger); padding: 20px;">Failed to load lists: ${escapeHtml(err.message)}</div>`;
   }
@@ -121,25 +171,25 @@ async function handleFileUpload(file) {
 
 async function viewContactsModal(listId, listName, page = 1) {
   currentViewingListId = listId;
+  currentViewingListName = listName;
   currentContactsPage = page;
 
   document.getElementById('modal-contacts-title').textContent = `Audience: ${listName}`;
-  const tableHead = document.getElementById('modal-contacts-thead');
   const tableBody = document.getElementById('modal-contacts-tbody');
   const pagination = document.getElementById('modal-contacts-pagination');
 
   tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px;">Loading contacts...</td></tr>`;
   openModal('modal-contacts');
 
-  const search = document.getElementById('modal-contacts-search').value || '';
+  const search = document.getElementById('modal-contacts-search')?.value || '';
 
   try {
-    const data = await api.get(`/contacts/list/${listId}?page=${page}&limit=20&search=${encodeURIComponent(search)}`);
+    const data = await api.get(`/contacts/list/${listId}?page=${page}&limit=${currentContactsLimit}&search=${encodeURIComponent(search)}`);
     const contacts = data.contacts || [];
 
     if (!contacts.length) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-dim);">No contacts found</td></tr>`;
-      pagination.innerHTML = '';
+      tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-dim);">No contacts found matching search</td></tr>`;
+      if (pagination) pagination.innerHTML = '';
       return;
     }
 
@@ -162,25 +212,32 @@ async function viewContactsModal(listId, listName, page = 1) {
       `;
     }).join('');
 
-    // Pagination
-    pagination.innerHTML = `
-      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 14px;">
-        <span style="font-size: 12px; color: var(--text-muted);">
-          Showing Page ${data.page} of ${data.totalPages || 1} (${data.total} total contacts)
-        </span>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-secondary btn-sm" ${data.page <= 1 ? 'disabled' : ''} onclick="viewContactsModal(${listId}, '${escapeHtml(listName)}', ${data.page - 1})">
-            Previous
-          </button>
-          <button class="btn btn-secondary btn-sm" ${data.page >= data.totalPages ? 'disabled' : ''} onclick="viewContactsModal(${listId}, '${escapeHtml(listName)}', ${data.page + 1})">
-            Next
-          </button>
-        </div>
-      </div>
-    `;
+    // Render modern pagination
+    if (window.renderPaginationControls && pagination) {
+      window.renderPaginationControls({
+        containerId: 'modal-contacts-pagination',
+        currentPage: data.page,
+        totalPages: data.totalPages,
+        totalItems: data.total,
+        limit: data.limit,
+        onPageChangeName: 'goToModalContactsPage',
+        onLimitChangeName: 'changeModalContactsLimit',
+        limitOptions: [10, 20, 50, 100],
+        itemName: 'contacts'
+      });
+    }
   } catch (err) {
     tableBody.innerHTML = `<tr><td colspan="5" style="color: var(--color-danger); padding: 20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
+}
+
+function goToModalContactsPage(page) {
+  viewContactsModal(currentViewingListId, currentViewingListName, page);
+}
+
+function changeModalContactsLimit(limit) {
+  currentContactsLimit = limit;
+  viewContactsModal(currentViewingListId, currentViewingListName, 1);
 }
 
 async function deleteSingleContact(contactId) {
@@ -238,7 +295,12 @@ function downloadSampleCSV() {
 }
 
 window.loadContactsView = loadContactsView;
+window.handleAudienceSearch = handleAudienceSearch;
+window.handleAudienceLimitChange = handleAudienceLimitChange;
+window.goToAudiencePage = goToAudiencePage;
 window.viewContactsModal = viewContactsModal;
+window.goToModalContactsPage = goToModalContactsPage;
+window.changeModalContactsLimit = changeModalContactsLimit;
 window.deleteSingleContact = deleteSingleContact;
 window.deleteAudienceList = deleteAudienceList;
 window.downloadSampleCSV = downloadSampleCSV;

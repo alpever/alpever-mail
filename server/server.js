@@ -45,9 +45,45 @@ app.get('/api/stats', async (req, res) => {
   }
 
   try {
+    const interval = (req.query.interval || '7d').toLowerCase();
+    const { startDate, endDate } = req.query;
+    let logDateCondition = '';
+    let campDateCondition = '';
+    const campParams = [];
+    const logParams = [];
+
+    if (interval === 'today') {
+      logDateCondition = 'AND sent_at >= CURDATE()';
+      campDateCondition = 'WHERE created_at >= CURDATE()';
+    } else if (interval === '7d') {
+      logDateCondition = 'AND sent_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
+      campDateCondition = 'WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
+    } else if (interval === '30d') {
+      logDateCondition = 'AND sent_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+      campDateCondition = 'WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+    } else if (interval === 'this_month') {
+      logDateCondition = 'AND sent_at >= DATE_FORMAT(NOW(), "%Y-%m-01")';
+      campDateCondition = 'WHERE created_at >= DATE_FORMAT(NOW(), "%Y-%m-01")';
+    } else if (interval === 'custom') {
+      if (startDate) {
+        logDateCondition += ' AND sent_at >= ?';
+        campDateCondition += (campDateCondition ? ' AND' : 'WHERE') + ' created_at >= ?';
+        logParams.push(`${startDate} 00:00:00`);
+        campParams.push(`${startDate} 00:00:00`);
+      }
+      if (endDate) {
+        logDateCondition += ' AND sent_at <= ?';
+        campDateCondition += (campDateCondition ? ' AND' : 'WHERE') + ' created_at <= ?';
+        logParams.push(`${endDate} 23:59:59`);
+        campParams.push(`${endDate} 23:59:59`);
+      }
+    }
+
     const [cStats] = await pool.query('SELECT COUNT(*) as count FROM contacts');
     const [lStats] = await pool.query('SELECT COUNT(*) as count FROM contact_lists');
     const [tStats] = await pool.query('SELECT COUNT(*) as count FROM templates');
+
+    // Interval-filtered campaign aggregate metrics
     const [campStats] = await pool.query(`
       SELECT 
         COUNT(*) as total_campaigns,
@@ -55,16 +91,30 @@ app.get('/api/stats', async (req, res) => {
         COALESCE(SUM(failed_count), 0) as total_failed,
         COALESCE(SUM(opened_count), 0) as total_opened
       FROM campaigns
-    `);
+      ${campDateCondition}
+    `, campParams);
 
-    const sent = Number(campStats[0].total_sent) || 0;
-    const failed = Number(campStats[0].total_failed) || 0;
-    const totalOpened = Number(campStats[0].total_opened) || 0;
+    // Accurate logs-level interval metrics using indexed sent_at & opened_at
+    const [logStats] = await pool.query(`
+      SELECT 
+        COUNT(CASE WHEN status = 'sent' THEN 1 END) as interval_sent,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as interval_failed,
+        COUNT(CASE WHEN opened_at IS NOT NULL THEN 1 END) as interval_opened
+      FROM campaign_logs
+      WHERE 1=1 ${logDateCondition}
+    `, logParams);
+
+    const hasDateFilter = Boolean(logDateCondition);
+    const sent = hasDateFilter ? (Number(logStats[0]?.interval_sent) || 0) : (Number(campStats[0]?.total_sent) || 0);
+    const failed = hasDateFilter ? (Number(logStats[0]?.interval_failed) || 0) : (Number(campStats[0]?.total_failed) || 0);
+    const totalOpened = hasDateFilter ? (Number(logStats[0]?.interval_opened) || 0) : (Number(campStats[0]?.total_opened) || 0);
     const totalProcessed = sent + failed;
     const successRate = totalProcessed > 0 ? Math.round((sent / totalProcessed) * 100) : 100;
+    const openRate = sent > 0 ? Math.round((totalOpened / sent) * 100) : 0;
 
     res.json({
       dbConnected: true,
+      interval,
       totalContacts: cStats[0].count,
       totalLists: lStats[0].count,
       totalTemplates: tStats[0].count,
@@ -72,6 +122,7 @@ app.get('/api/stats', async (req, res) => {
       totalSent: sent,
       totalFailed: failed,
       totalOpened,
+      openRate,
       successRate
     });
   } catch (err) {

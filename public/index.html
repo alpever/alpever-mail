@@ -11,7 +11,7 @@
   <link rel="icon" type="image/png" href="/img/logo.png" />
   <link rel="stylesheet" href="/css/variables.css" />
   <link rel="stylesheet" href="/css/layout.css" />
-  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/components.css?v=6" />
   <link rel="stylesheet" href="/css/editor.css?v=6" />
 </head>
 
@@ -84,6 +84,55 @@
 
         <!-- 1. DASHBOARD VIEW -->
         <section class="view-section active" id="view-dashboard">
+          <!-- Dashboard Control Header with Time Interval Picker -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <h2 style="font-size: 20px; font-weight: 800; color: var(--text-main); margin-bottom: 4px;">Analytics Overview</h2>
+              <p style="font-size: 13px; color: var(--text-muted); margin: 0;">Real-time email delivery, opens, and campaign engagement metrics</p>
+            </div>
+
+            <!-- Time Interval Selector (Matching Screenshot) -->
+            <div class="time-interval-box">
+              <span class="time-interval-label">TIME INTERVAL</span>
+              <div class="time-interval-wrap" id="time-interval-container">
+                <button type="button" class="time-interval-btn" id="btn-time-interval" onclick="toggleTimeIntervalMenu()">
+                  <span id="selected-interval-text">Last 7 Days</span>
+                  <span class="time-interval-chevron">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </span>
+                </button>
+                <div class="time-interval-menu" id="menu-time-interval">
+                  <div class="time-interval-item" data-val="today" onclick="selectTimeInterval('today', 'Today')">
+                    <span>Today</span>
+                    <span class="item-check">✓</span>
+                  </div>
+                  <div class="time-interval-item selected" data-val="7d" onclick="selectTimeInterval('7d', 'Last 7 Days')">
+                    <span>Last 7 Days</span>
+                    <span class="item-check">✓</span>
+                  </div>
+                  <div class="time-interval-item" data-val="30d" onclick="selectTimeInterval('30d', 'Last 30 Days')">
+                    <span>Last 30 Days</span>
+                    <span class="item-check">✓</span>
+                  </div>
+                  <div class="time-interval-item" data-val="this_month" onclick="selectTimeInterval('this_month', 'This Month')">
+                    <span>This Month</span>
+                    <span class="item-check">✓</span>
+                  </div>
+                  <div class="time-interval-item" data-val="custom" onclick="openCustomDateModal()">
+                    <span>Custom Range</span>
+                    <span class="item-check">✓</span>
+                  </div>
+                  <div class="time-interval-item" data-val="all" onclick="selectTimeInterval('all', 'All Time')">
+                    <span>All Time</span>
+                    <span class="item-check">✓</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Metric Stat Cards -->
           <div class="grid-stats">
             <div class="stat-card">
@@ -214,10 +263,26 @@
 
           <!-- Uploaded Lists Grid -->
           <div class="card">
+            <div class="view-filter-bar">
+              <div class="view-filter-group">
+                <input type="text" id="search-audience-lists" class="view-search-input" placeholder="Search audience lists by name or description..." oninput="handleAudienceSearch(this.value)" />
+              </div>
+              <div class="pagination-limit-wrap">
+                <span>Show:</span>
+                <select class="pagination-select" id="audience-limit-select" onchange="handleAudienceLimitChange(this.value)">
+                  <option value="6">6 lists</option>
+                  <option value="12" selected>12 lists</option>
+                  <option value="24">24 lists</option>
+                </select>
+              </div>
+            </div>
+
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;"
               id="audience-lists-grid">
               <div style="padding: 20px; color: var(--text-dim);">Loading audience lists...</div>
             </div>
+
+            <div id="audience-lists-pagination" class="pagination-bar"></div>
           </div>
         </section>
 
@@ -504,6 +569,30 @@
               </button>
             </div>
 
+            <!-- Campaign Filters & Search Toolbar -->
+            <div class="view-filter-bar">
+              <div class="view-filter-group">
+                <input type="text" id="campaigns-search-input" class="view-search-input" placeholder="Search campaigns by name, sender..." oninput="handleCampaignSearch(this.value)" />
+                <select class="pagination-select" id="campaigns-status-select" onchange="handleCampaignStatusFilter(this.value)" style="padding: 6px 12px; font-size: 13px;">
+                  <option value="all">All Statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="queued">Queued</option>
+                  <option value="processing">Processing</option>
+                  <option value="completed">Completed</option>
+                  <option value="paused">Paused</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+              <div class="pagination-limit-wrap">
+                <span>Per Page:</span>
+                <select class="pagination-select" id="campaigns-limit-select" onchange="handleCampaignLimitChange(this.value)">
+                  <option value="10" selected>10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+
             <div class="table-container">
               <table class="custom-table">
                 <thead>
@@ -525,6 +614,9 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- Campaigns Pagination Bar -->
+            <div id="campaigns-pagination" class="pagination-bar"></div>
           </div>
         </section>
 
@@ -976,16 +1068,46 @@
     </div>
   </div>
 
+  <!-- MODAL: CUSTOM DATE RANGE PICKER -->
+  <div class="modal-backdrop" id="modal-custom-date-range">
+    <div class="modal-dialog" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📅 Custom Date Range</h3>
+        <button class="btn-icon" onclick="closeModal('modal-custom-date-range')">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px;">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Filter dashboard analytics, delivery rates, and email read statistics between specific dates:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 12px; font-weight: 600;">START DATE (From):</label>
+            <input type="date" id="custom-range-start" class="form-input" style="font-size: 13px;" />
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-size: 12px; font-weight: 600;">END DATE (To):</label>
+            <input type="date" id="custom-range-end" class="form-input" style="font-size: 13px;" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-custom-date-range')">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="applyCustomDateRange()">Apply Range &rarr;</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="/js/components/toasts.js?v=2"></script>
   <script src="/js/components/modal.js?v=2"></script>
+  <script src="/js/components/pagination.js?v=2"></script>
   <script src="/js/api.js?v=2"></script>
-  <script src="/js/views/dashboard.js?v=3"></script>
-  <script src="/js/views/contacts.js?v=2"></script>
+  <script src="/js/views/dashboard.js?v=4"></script>
+  <script src="/js/views/contacts.js?v=3"></script>
   <script src="/js/views/templates.js?v=8"></script>
-  <script src="/js/views/campaign.js?v=4"></script>
-  <script src="/js/views/history.js?v=3"></script>
-  <script src="/js/app.js?v=2"></script>
+  <script src="/js/views/campaign.js?v=5"></script>
+  <script src="/js/views/history.js?v=4"></script>
+  <script src="/js/app.js?v=3"></script>
 </body>
 
 </html>

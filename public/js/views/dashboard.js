@@ -1,10 +1,22 @@
 /**
- * Dashboard View Controller
+ * Dashboard View Controller with Time Interval Filtering
  */
 
-async function loadDashboardView() {
+let currentDashboardInterval = '7d';
+let customStartDate = '';
+let customEndDate = '';
+
+async function loadDashboardView(interval = currentDashboardInterval, extraParams = {}) {
   try {
-    const stats = await api.get('/stats');
+    currentDashboardInterval = interval;
+    let url = `/stats?interval=${encodeURIComponent(interval)}`;
+    if (interval === 'custom') {
+      const s = extraParams.startDate || customStartDate;
+      const e = extraParams.endDate || customEndDate;
+      if (s) url += `&startDate=${encodeURIComponent(s)}`;
+      if (e) url += `&endDate=${encodeURIComponent(e)}`;
+    }
+    const stats = await api.get(url);
 
     // Update stat metrics safely
     const setTxt = (id, val) => {
@@ -17,6 +29,7 @@ async function loadDashboardView() {
     setTxt('stat-total-templates', Number(stats.totalTemplates || 0).toLocaleString());
     setTxt('stat-total-campaigns', Number(stats.totalCampaigns || 0).toLocaleString());
     setTxt('stat-total-sent', Number(stats.totalSent || 0).toLocaleString());
+
     const openedNum = Number(stats.totalOpened || 0);
     const sentNum = Number(stats.totalSent || 0);
     const openPct = sentNum > 0 ? Math.round((openedNum / sentNum) * 100) : 0;
@@ -42,6 +55,98 @@ async function loadDashboardView() {
   } catch (err) {
     console.error('Error loading dashboard stats:', err);
   }
+}
+
+function toggleTimeIntervalMenu() {
+  const btn = document.getElementById('btn-time-interval');
+  const menu = document.getElementById('menu-time-interval');
+  if (!btn || !menu) return;
+
+  const isOpen = menu.classList.contains('show');
+  if (isOpen) {
+    menu.classList.remove('show');
+    btn.classList.remove('active');
+  } else {
+    menu.classList.add('show');
+    btn.classList.add('active');
+
+    // Close on outside click
+    const closeListener = (e) => {
+      if (!btn.contains(e.target) && !menu.contains(e.target)) {
+        menu.classList.remove('show');
+        btn.classList.remove('active');
+        document.removeEventListener('click', closeListener);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeListener), 10);
+  }
+}
+
+function selectTimeInterval(intervalKey, labelText, extraParams = {}) {
+  const btn = document.getElementById('btn-time-interval');
+  const menu = document.getElementById('menu-time-interval');
+  const labelSpan = document.getElementById('selected-interval-text');
+
+  if (labelSpan) labelSpan.textContent = labelText;
+
+  // Update checkmark state
+  document.querySelectorAll('.time-interval-item').forEach(item => {
+    item.classList.toggle('selected', item.dataset.val === intervalKey);
+  });
+
+  if (menu) menu.classList.remove('show');
+  if (btn) btn.classList.remove('active');
+
+  // Reload stats with selected interval
+  loadDashboardView(intervalKey, extraParams);
+}
+
+function openCustomDateModal() {
+  const menu = document.getElementById('menu-time-interval');
+  const btn = document.getElementById('btn-time-interval');
+  if (menu) menu.classList.remove('show');
+  if (btn) btn.classList.remove('active');
+
+  const startInput = document.getElementById('custom-range-start');
+  const endInput = document.getElementById('custom-range-end');
+  
+  if (startInput && !startInput.value) {
+    const d = new Date();
+    d.setDate(d.getDate() - 14);
+    startInput.value = d.toISOString().split('T')[0];
+  }
+  if (endInput && !endInput.value) {
+    endInput.value = new Date().toISOString().split('T')[0];
+  }
+
+  if (typeof openModal === 'function') {
+    openModal('modal-custom-date-range');
+  }
+}
+
+function applyCustomDateRange() {
+  const startInput = document.getElementById('custom-range-start');
+  const endInput = document.getElementById('custom-range-end');
+
+  customStartDate = startInput?.value || '';
+  customEndDate = endInput?.value || '';
+
+  if (!customStartDate && !customEndDate) {
+    if (typeof showToast === 'function') {
+      showToast('Please select at least one date', 'warning');
+    }
+    return;
+  }
+
+  if (typeof closeModal === 'function') {
+    closeModal('modal-custom-date-range');
+  }
+
+  const label = customStartDate && customEndDate 
+    ? `${customStartDate} → ${customEndDate}` 
+    : (customStartDate ? `From ${customStartDate}` : `Until ${customEndDate}`);
+
+  selectTimeInterval('custom', label, { startDate: customStartDate, endDate: customEndDate });
 }
 
 async function loadRecentCampaigns() {
@@ -99,3 +204,7 @@ async function loadRecentCampaigns() {
 }
 
 window.loadDashboardView = loadDashboardView;
+window.toggleTimeIntervalMenu = toggleTimeIntervalMenu;
+window.selectTimeInterval = selectTimeInterval;
+window.openCustomDateModal = openCustomDateModal;
+window.applyCustomDateRange = applyCustomDateRange;
