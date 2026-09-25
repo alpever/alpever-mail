@@ -24,7 +24,7 @@ async function populateCampaignsDropdownForLogs() {
 
     select.innerHTML = campaigns.map(c => `
       <option value="${c.id}" ${c.id === selectedCampaignForLogs ? 'selected' : ''}>
-        ${escapeHtml(c.name)} (${c.sent_count || 0}/${c.total_count || 0} sent) - ${new Date(c.created_at).toLocaleDateString()}
+        ${escapeHtml(c.name)} (${c.sent_count || 0} sent • ${c.opened_count || 0} opened) - ${new Date(c.created_at).toLocaleDateString()}
       </option>
     `).join('');
 
@@ -61,11 +61,11 @@ async function loadCampaignLogsTable() {
   if (!tbody) return;
 
   if (!selectedCampaignForLogs) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 30px;">Select a campaign to view delivery audit logs.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 30px;">Select a campaign to view delivery audit logs.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px;">Loading logs...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;">Loading logs...</td></tr>`;
 
   try {
     let url = `/campaigns/${selectedCampaignForLogs}/logs?page=${currentLogsPage}&limit=30`;
@@ -75,7 +75,7 @@ async function loadCampaignLogsTable() {
     const logs = data.logs || [];
 
     if (!logs.length) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 30px;">No logs match the current filter.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 30px;">No logs match the current filter.</td></tr>`;
       pagination.innerHTML = '';
       return;
     }
@@ -87,18 +87,35 @@ async function loadCampaignLogsTable() {
         pending: 'badge-secondary'
       }[l.status] || 'badge-secondary';
 
+      const isOpened = Boolean(l.opened_at);
+      const openHtml = isOpened ? `
+        <div>
+          <div style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.12); color: #10b981; font-weight: 600; font-size: 11px;">
+            <span>👁️</span> Opened (${l.open_count || 1}x)
+          </div>
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+            ${new Date(l.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • ${new Date(l.opened_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+          </div>
+        </div>
+      ` : `
+        <span style="color: var(--text-dim); font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(148, 163, 184, 0.08);">
+          Unopened
+        </span>
+      `;
+
       return `
         <tr>
           <td>#${l.id}</td>
           <td><strong>${escapeHtml(l.recipient_name || '—')}</strong></td>
           <td><code>${escapeHtml(l.email)}</code></td>
           <td><span class="badge ${badgeClass}">${l.status}</span></td>
+          <td>${openHtml}</td>
           <td>
             ${l.resend_id ? `<span style="font-family: var(--font-mono); font-size: 11px; color: #a5b4fc;">${escapeHtml(l.resend_id)}</span>` : '<span style="color: var(--text-dim);">—</span>'}
             ${l.error_message ? `<div style="font-size: 11px; color: var(--color-danger); margin-top: 3px;">${escapeHtml(l.error_message)}</div>` : ''}
           </td>
           <td style="font-size: 12px; color: var(--text-dim);">
-            ${l.sent_at ? new Date(l.sent_at).toLocaleTimeString() : 'Pending'}
+            ${l.sent_at ? new Date(l.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending'}
           </td>
         </tr>
       `;

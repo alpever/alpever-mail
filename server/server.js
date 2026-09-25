@@ -10,6 +10,7 @@ const { router: settingsRouter } = require('./routes/settingsRoutes');
 const contactRouter = require('./routes/contactRoutes');
 const templateRouter = require('./routes/templateRoutes');
 const campaignRouter = require('./routes/campaignRoutes');
+const trackRouter = require('./routes/trackRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,7 @@ app.get('/api/stats', async (req, res) => {
       totalCampaigns: 0,
       totalSent: 0,
       totalFailed: 0,
+      totalOpened: 0,
       successRate: 100
     });
   }
@@ -50,12 +52,14 @@ app.get('/api/stats', async (req, res) => {
       SELECT 
         COUNT(*) as total_campaigns,
         COALESCE(SUM(sent_count), 0) as total_sent,
-        COALESCE(SUM(failed_count), 0) as total_failed
+        COALESCE(SUM(failed_count), 0) as total_failed,
+        COALESCE(SUM(opened_count), 0) as total_opened
       FROM campaigns
     `);
 
     const sent = Number(campStats[0].total_sent) || 0;
     const failed = Number(campStats[0].total_failed) || 0;
+    const totalOpened = Number(campStats[0].total_opened) || 0;
     const totalProcessed = sent + failed;
     const successRate = totalProcessed > 0 ? Math.round((sent / totalProcessed) * 100) : 100;
 
@@ -67,6 +71,7 @@ app.get('/api/stats', async (req, res) => {
       totalCampaigns: campStats[0].total_campaigns,
       totalSent: sent,
       totalFailed: failed,
+      totalOpened,
       successRate
     });
   } catch (err) {
@@ -79,6 +84,7 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/contacts', contactRouter);
 app.use('/api/templates', templateRouter);
 app.use('/api/campaigns', campaignRouter);
+app.use('/api/track', trackRouter);
 
 // Fallback to index.html for SPA client-side routes
 app.get('*', (req, res) => {

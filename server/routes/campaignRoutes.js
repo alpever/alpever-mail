@@ -31,19 +31,21 @@ router.get('/', async (req, res) => {
     // Check if any is currently running in memory
     const enriched = rows.map(camp => {
       const active = getCampaignProgress(camp.id);
-      if (active) {
-        return {
-          ...camp,
-          status: active.status,
-          sent_count: active.sent,
-          failed_count: active.failed,
-          percentage: active.percentage,
-          etaSeconds: active.etaSeconds
-        };
-      }
+      const sent = active ? active.sent : Number(camp.sent_count || 0);
+      const failed = active ? active.failed : Number(camp.failed_count || 0);
+      const opened = Number(camp.opened_count || 0);
+      const openRate = sent > 0 ? Math.round((opened / sent) * 100) : 0;
+      const percentage = camp.total_count > 0 ? Math.round(((sent + failed) / camp.total_count) * 100) : 0;
+
       return {
         ...camp,
-        percentage: camp.total_count > 0 ? Math.round(((camp.sent_count + camp.failed_count) / camp.total_count) * 100) : 0
+        status: active ? active.status : camp.status,
+        sent_count: sent,
+        failed_count: failed,
+        opened_count: opened,
+        openRate,
+        percentage,
+        etaSeconds: active ? active.etaSeconds : undefined
       };
     });
 
@@ -376,7 +378,10 @@ router.get('/:id/logs', async (req, res) => {
     let dataQuery = 'SELECT * FROM campaign_logs WHERE campaign_id = ?';
     const params = [campaignId];
 
-    if (statusFilter && ['sent', 'failed', 'pending'].includes(statusFilter)) {
+    if (statusFilter === 'opened') {
+      countQuery += ' AND opened_at IS NOT NULL';
+      dataQuery += ' AND opened_at IS NOT NULL';
+    } else if (statusFilter && ['sent', 'failed', 'pending'].includes(statusFilter)) {
       countQuery += ' AND status = ?';
       dataQuery += ' AND status = ?';
       params.push(statusFilter);
@@ -411,16 +416,19 @@ router.get('/:id/export', async (req, res) => {
     const campaignName = cRows.length ? cRows[0].name.replace(/[^a-zA-Z0-9_-]/g, '_') : `campaign_${req.params.id}`;
 
     const [logs] = await pool.query(
-      'SELECT id, email, recipient_name, status, resend_id, error_message, sent_at FROM campaign_logs WHERE campaign_id = ? ORDER BY id ASC',
+      'SELECT id, email, recipient_name, status, resend_id, error_message, sent_at, opened_at, open_count FROM campaign_logs WHERE campaign_id = ? ORDER BY id ASC',
       [req.params.id]
     );
 
-    const headers = ['Log ID', 'Email', 'Recipient Name', 'Status', 'Resend ID', 'Error Reason', 'Sent Timestamp'];
+    const headers = ['Log ID', 'Email', 'Recipient Name', 'Delivery Status', 'Open / Read Status', 'Times Opened', 'First Opened At', 'Resend ID', 'Error Reason', 'Sent Timestamp'];
     const rows = logs.map(l => [
       l.id,
       `"${(l.email || '').replace(/"/g, '""')}"`,
       `"${(l.recipient_name || '').replace(/"/g, '""')}"`,
       l.status,
+      l.opened_at ? 'Opened' : 'Unopened',
+      l.open_count || 0,
+      l.opened_at ? new Date(l.opened_at).toISOString() : '',
       l.resend_id || '',
       `"${(l.error_message || '').replace(/"/g, '""')}"`,
       l.sent_at ? new Date(l.sent_at).toISOString() : ''

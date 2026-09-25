@@ -111,4 +111,31 @@ const resolvedLegacy = resolveEmailImages(htmlWithLegacy);
 assert(!resolvedLegacy.includes('https://iili.io/nAo6aa9.jpg') && resolvedLegacy.includes('/uploads/images/'), 'Legacy iili links should be rescued to local uploads');
 console.log('  ✓ Legacy freeimage.host / iili.io URLs are auto-rescued to local uploads');
 
+console.log('\n5️⃣ Testing Email Open Tracking Engine...');
+const {
+  TRANSPARENT_1X1_GIF,
+  generateTrackingToken,
+  parseTrackingToken,
+  generateTrackingPixel
+} = require('../server/services/trackService');
+
+// Verify token encoding & decoding
+const token = generateTrackingToken(42, 9);
+const parsed = parseTrackingToken(token);
+assert.strictEqual(parsed.logId, 42, 'Decoded logId must match original');
+assert.strictEqual(parsed.campaignId, 9, 'Decoded campaignId must match original');
+console.log('  ✓ Tracking token successfully generated and decoded:', token, '->', parsed);
+
+// Verify pixel tag generation
+process.env.APP_URL = 'https://mailer.alpever.com';
+const pixelTag = generateTrackingPixel(42, 9);
+assert(pixelTag.includes('https://mailer.alpever.com/api/track/open/' + token), 'Pixel tag must contain full domain and token');
+assert(pixelTag.includes('display:none!important'), 'Pixel tag must be invisible');
+console.log('  ✓ Invisible tracking pixel <img> generated correctly');
+
+// Verify GIF buffer
+assert.strictEqual(TRANSPARENT_1X1_GIF.length, 42, 'Transparent GIF must be exactly 42 bytes');
+assert(TRANSPARENT_1X1_GIF.toString('ascii').startsWith('GIF89a'), 'Buffer must be valid GIF89a header');
+console.log('  ✓ 42-byte transparent GIF header validated');
+
 console.log('\n🎉 ALL UNIT TESTS PASSED SUCCESSFULLY! Everything is working properly.');

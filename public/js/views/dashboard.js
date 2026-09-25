@@ -17,6 +17,10 @@ async function loadDashboardView() {
     setTxt('stat-total-templates', Number(stats.totalTemplates || 0).toLocaleString());
     setTxt('stat-total-campaigns', Number(stats.totalCampaigns || 0).toLocaleString());
     setTxt('stat-total-sent', Number(stats.totalSent || 0).toLocaleString());
+    const openedNum = Number(stats.totalOpened || 0);
+    const sentNum = Number(stats.totalSent || 0);
+    const openPct = sentNum > 0 ? Math.round((openedNum / sentNum) * 100) : 0;
+    setTxt('stat-total-opened', `${openedNum.toLocaleString()} (${openPct}%)`);
     setTxt('stat-success-rate', `${stats.successRate || 100}%`);
 
     // Update Header Status Pill

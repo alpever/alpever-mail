@@ -81,14 +81,36 @@ async function runMigrations(pool) {
       resend_id VARCHAR(100),
       error_message TEXT,
       sent_at TIMESTAMP NULL,
+      opened_at TIMESTAMP NULL,
+      open_count INT DEFAULT 0,
+      user_agent VARCHAR(500) NULL,
+      ip_address VARCHAR(100) NULL,
       INDEX idx_log_campaign (campaign_id),
       INDEX idx_log_status (status),
+      INDEX idx_log_opened (opened_at),
       CONSTRAINT fk_log_campaign FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
   ];
 
   for (const q of queries) {
     await pool.query(q);
+  }
+
+  // Safe migrations for existing databases
+  const alterMigrations = [
+    'ALTER TABLE campaign_logs ADD COLUMN opened_at TIMESTAMP NULL',
+    'ALTER TABLE campaign_logs ADD COLUMN open_count INT DEFAULT 0',
+    'ALTER TABLE campaign_logs ADD COLUMN user_agent VARCHAR(500) NULL',
+    'ALTER TABLE campaign_logs ADD COLUMN ip_address VARCHAR(100) NULL',
+    'ALTER TABLE campaigns ADD COLUMN opened_count INT DEFAULT 0'
+  ];
+
+  for (const altQ of alterMigrations) {
+    try {
+      await pool.query(altQ);
+    } catch (e) {
+      // Column already exists - safely ignore
+    }
   }
 
   // Seed default templates if none exist

@@ -71,6 +71,14 @@ async function loadCampaignsList() {
               <span style="color: var(--color-danger);">${c.failed_count || 0} failed</span>
             </div>
           </td>
+          <td>
+            <div style="font-weight: 700; color: #10b981; font-size: 13px;">
+              👁️ ${Number(c.opened_count || 0).toLocaleString()} opened
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+              ${(c.sent_count || 0) > 0 ? `${c.openRate || 0}% open rate` : '0%'}
+            </div>
+          </td>
           <td><span class="badge ${badgeClass}">${c.status}</span></td>
           <td>
             <div style="display: flex; gap: 6px;">

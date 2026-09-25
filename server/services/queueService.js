@@ -1,6 +1,7 @@
 const { getPool } = require('../db/pool');
 const { renderEmail } = require('./templateEngine');
 const { sendBatchEmails, sendSingleEmail } = require('./resendService');
+const { generateTrackingPixel } = require('./trackService');
 
 // Active campaigns in-memory state for live monitoring
 const activeCampaigns = new Map();
@@ -186,11 +187,15 @@ async function executeCampaign(campaignId, apiKey) {
             { sender_name: campaign.from_name }
           );
 
+          // Append invisible open tracking pixel
+          const trackingTag = generateTrackingPixel(logItem.id, campaignId);
+          const finalHtml = `${rendered.html}\n${trackingTag}`;
+
           emailBatch.push({
             from: `${campaign.from_name} <${campaign.from_email}>`,
             to: logItem.email,
             subject: rendered.subject,
-            html: rendered.html,
+            html: finalHtml,
             ...(campaign.reply_to ? { reply_to: campaign.reply_to } : {})
           });
 

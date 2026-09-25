@@ -108,6 +108,13 @@
               </div>
             </div>
             <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">👁️</div>
+              <div>
+                <div class="stat-value" id="stat-total-opened" style="color: #10b981;">0</div>
+                <div class="stat-label">Total Emails Read / Opened</div>
+              </div>
+            </div>
+            <div class="stat-card">
               <div class="stat-icon rose">🎯</div>
               <div>
                 <div class="stat-value" id="stat-success-rate">100%</div>
@@ -506,13 +513,14 @@
                     <th>Template</th>
                     <th>Recipients</th>
                     <th>Delivery Progress</th>
+                    <th>Opens / Reads</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="campaigns-table-tbody">
                   <tr>
-                    <td colspan="7" style="text-align: center; padding: 20px;">Loading campaigns...</td>
+                    <td colspan="8" style="text-align: center; padding: 20px;">Loading campaigns...</td>
                   </tr>
                 </tbody>
               </table>
@@ -544,6 +552,8 @@
               <div style="display: flex; gap: 8px;">
                 <button class="btn btn-secondary btn-sm log-filter-btn active" data-status=""
                   onclick="filterLogsByStatus('')">All</button>
+                <button class="btn btn-secondary btn-sm log-filter-btn" data-status="opened"
+                  onclick="filterLogsByStatus('opened')">Opened 👁️</button>
                 <button class="btn btn-secondary btn-sm log-filter-btn" data-status="sent"
                   onclick="filterLogsByStatus('sent')">Sent</button>
                 <button class="btn btn-secondary btn-sm log-filter-btn" data-status="failed"
@@ -560,14 +570,15 @@
                     <th>Log ID</th>
                     <th>Recipient Name</th>
                     <th>Email Address</th>
-                    <th>Status</th>
+                    <th>Delivery</th>
+                    <th>Open / Read Status</th>
                     <th>Resend Message ID / Error</th>
                     <th>Sent At</th>
                   </tr>
                 </thead>
                 <tbody id="history-logs-tbody">
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 20px;">Select a campaign to view logs</td>
+                    <td colspan="7" style="text-align: center; padding: 20px;">Select a campaign to view logs</td>
                   </tr>
                 </tbody>
               </table>
@@ -969,11 +980,11 @@
   <script src="/js/components/toasts.js?v=2"></script>
   <script src="/js/components/modal.js?v=2"></script>
   <script src="/js/api.js?v=2"></script>
-  <script src="/js/views/dashboard.js?v=2"></script>
+  <script src="/js/views/dashboard.js?v=3"></script>
   <script src="/js/views/contacts.js?v=2"></script>
   <script src="/js/views/templates.js?v=8"></script>
-  <script src="/js/views/campaign.js?v=2"></script>
-  <script src="/js/views/history.js?v=2"></script>
+  <script src="/js/views/campaign.js?v=4"></script>
+  <script src="/js/views/history.js?v=3"></script>
   <script src="/js/app.js?v=2"></script>
 </body>
 
