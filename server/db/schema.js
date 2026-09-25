@@ -99,6 +99,56 @@ async function runMigrations(pool) {
       INDEX idx_cl_camp_status (campaign_id, status),
       INDEX idx_cl_camp_opened (campaign_id, opened_at),
       CONSTRAINT fk_log_campaign FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+
+    // 7. Scheduled Drip Automations
+    `CREATE TABLE IF NOT EXISTS automations (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      template_id INT NOT NULL,
+      list_id INT NOT NULL,
+      from_name VARCHAR(255) NOT NULL,
+      from_email VARCHAR(255) NOT NULL,
+      reply_to VARCHAR(255) NULL,
+      daily_limit INT NOT NULL DEFAULT 10,
+      send_time VARCHAR(10) NOT NULL DEFAULT '10:00',
+      status VARCHAR(50) DEFAULT 'active',
+      total_count INT DEFAULT 0,
+      sent_count INT DEFAULT 0,
+      failed_count INT DEFAULT 0,
+      opened_count INT DEFAULT 0,
+      last_run_at TIMESTAMP NULL,
+      last_run_date VARCHAR(20) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_auto_status (status),
+      INDEX idx_auto_status_time (status, send_time),
+      INDEX idx_auto_created (created_at),
+      CONSTRAINT fk_auto_template FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE CASCADE,
+      CONSTRAINT fk_auto_list FOREIGN KEY (list_id) REFERENCES contact_lists(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+
+    // 8. Automation Recipient Logs
+    `CREATE TABLE IF NOT EXISTS automation_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      automation_id INT NOT NULL,
+      contact_id INT,
+      email VARCHAR(255) NOT NULL,
+      recipient_name VARCHAR(255),
+      status VARCHAR(50) DEFAULT 'pending',
+      resend_id VARCHAR(100),
+      error_message TEXT,
+      sent_at TIMESTAMP NULL,
+      opened_at TIMESTAMP NULL,
+      open_count INT DEFAULT 0,
+      user_agent VARCHAR(500) NULL,
+      ip_address VARCHAR(100) NULL,
+      INDEX idx_al_auto (automation_id),
+      INDEX idx_al_status (status),
+      INDEX idx_al_auto_status (automation_id, status),
+      INDEX idx_al_opened (opened_at),
+      INDEX idx_al_sent_at (sent_at),
+      CONSTRAINT fk_al_auto FOREIGN KEY (automation_id) REFERENCES automations(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
   ];
 

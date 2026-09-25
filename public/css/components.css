@@ -78,6 +78,27 @@
   flex-shrink: 0;
 }
 
+.stat-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  stroke-width: 2;
+  stroke: currentColor;
+  vertical-align: middle;
+}
+
+.btn-sm svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* AlpEver Pastel Squircle Palette (Matching Screenshot) */
 .stat-icon.indigo {
   background: var(--stat-purple-bg);

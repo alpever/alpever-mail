@@ -33,23 +33,67 @@
 
       <nav class="sidebar-nav">
         <a class="nav-item active" data-view="dashboard" id="nav-dashboard">
-          <span class="nav-icon">📊</span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+              <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+            </svg>
+          </span>
           <span class="nav-label">Dashboard</span>
         </a>
         <a class="nav-item" data-view="contacts" id="nav-contacts">
-          <span class="nav-icon">👥</span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </span>
           <span class="nav-label">Audience & Upload</span>
         </a>
         <a class="nav-item" data-view="templates" id="nav-templates">
-          <span class="nav-icon">✉️</span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+          </span>
           <span class="nav-label">Dynamic Templates</span>
         </a>
         <a class="nav-item" data-view="campaigns" id="nav-campaigns">
-          <span class="nav-icon">🚀</span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </span>
           <span class="nav-label">Mass Campaigns</span>
         </a>
+        <a class="nav-item" data-view="automations" id="nav-automations">
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="18" cy="18" r="3"></circle>
+              <circle cx="6" cy="6" r="3"></circle>
+              <path d="M6 9v12"></path>
+              <path d="M18 9a9 9 0 0 0-9 9"></path>
+            </svg>
+          </span>
+          <span class="nav-label">Automations</span>
+        </a>
         <a class="nav-item" data-view="history" id="nav-history">
-          <span class="nav-icon">📋</span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+              <line x1="9" y1="12" x2="15" y2="12"></line>
+              <line x1="9" y1="16" x2="15" y2="16"></line>
+            </svg>
+          </span>
           <span class="nav-label">Delivery Logs</span>
         </a>
       </nav>
@@ -74,7 +118,11 @@
             <span id="header-db-text">MySQL Connected</span>
           </div>
           <button class="btn btn-primary btn-sm" onclick="openCreateCampaignModal()">
-            <span>⚡</span> New Campaign
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            New Campaign
           </button>
         </div>
       </header>
@@ -136,35 +184,68 @@
           <!-- Metric Stat Cards -->
           <div class="grid-stats">
             <div class="stat-card">
-              <div class="stat-icon indigo">👥</div>
+              <div class="stat-icon indigo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+              </div>
               <div>
                 <div class="stat-value" id="stat-total-contacts">0</div>
                 <div class="stat-label">Total Contacts Uploaded</div>
               </div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon purple">✉️</div>
+              <div class="stat-icon purple">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+              </div>
               <div>
                 <div class="stat-value" id="stat-total-templates">0</div>
                 <div class="stat-label">Dynamic Templates</div>
               </div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon emerald">🚀</div>
+              <div class="stat-icon emerald">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </div>
               <div>
                 <div class="stat-value" id="stat-total-sent">0</div>
                 <div class="stat-label">Total Emails Dispatched</div>
               </div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">👁️</div>
+              <div class="stat-icon" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </div>
               <div>
                 <div class="stat-value" id="stat-total-opened" style="color: #10b981;">0</div>
                 <div class="stat-label">Total Emails Read / Opened</div>
               </div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon rose">🎯</div>
+              <div class="stat-icon rose">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="m4.93 4.93 4.24 4.24"></path>
+                  <path d="m14.83 9.17 4.24-4.24"></path>
+                  <path d="m14.83 14.83 4.24 4.24"></path>
+                  <path d="m9.17 14.83-4.24 4.24"></path>
+                  <circle cx="12" cy="12" r="4"></circle>
+                </svg>
+              </div>
               <div>
                 <div class="stat-value" id="stat-success-rate">100%</div>
                 <div class="stat-label">Delivery Success Rate</div>
@@ -620,6 +701,56 @@
           </div>
         </section>
 
+        <!-- 4.1 SCHEDULED DRIP AUTOMATIONS VIEW -->
+        <section class="view-section" id="view-automations">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Daily Drip Automations</h2>
+                <p class="card-subtitle">Automated daily dispatch — set your custom time and custom daily quantity</p>
+              </div>
+              <button class="btn btn-primary" onclick="openCreateAutomationModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Create New Automation
+              </button>
+            </div>
+
+            <!-- Automations Filters & Search Toolbar -->
+            <div class="view-filter-bar">
+              <div class="view-filter-group">
+                <input type="text" id="automations-search-input" class="view-search-input" placeholder="Search automations by name or sender..." oninput="handleAutomationSearch(this.value)" />
+                <select class="pagination-select" id="automations-status-select" onchange="handleAutomationStatusFilter(this.value)" style="padding: 6px 12px; font-size: 13px;">
+                  <option value="all">All Automations</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+              <div class="pagination-limit-wrap">
+                <span>Per Page:</span>
+                <select class="pagination-select" id="automations-limit-select" onchange="handleAutomationLimitChange(this.value)">
+                  <option value="6" selected>6</option>
+                  <option value="12">12</option>
+                  <option value="24">24</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Automations Cards Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 18px;" id="automations-grid">
+              <div style="padding: 24px; color: var(--text-dim); text-align: center; grid-column: 1 / -1;">
+                Loading automations...
+              </div>
+            </div>
+
+            <!-- Automations Pagination Bar -->
+            <div id="automations-pagination" class="pagination-bar"></div>
+          </div>
+        </section>
+
         <!-- 5. HISTORY & AUDIT LOGS VIEW -->
         <section class="view-section" id="view-history">
           <div class="card">
@@ -629,7 +760,12 @@
                 <p class="card-subtitle">Detailed recipient-by-recipient logs and delivery statuses</p>
               </div>
               <button class="btn btn-secondary btn-sm" onclick="exportCampaignLogsCSV()">
-                📥 Export Report as CSV
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export Report as CSV
               </button>
             </div>
 
@@ -645,7 +781,7 @@
                 <button class="btn btn-secondary btn-sm log-filter-btn active" data-status=""
                   onclick="filterLogsByStatus('')">All</button>
                 <button class="btn btn-secondary btn-sm log-filter-btn" data-status="opened"
-                  onclick="filterLogsByStatus('opened')">Opened 👁️</button>
+                  onclick="filterLogsByStatus('opened')">Opened</button>
                 <button class="btn btn-secondary btn-sm log-filter-btn" data-status="sent"
                   onclick="filterLogsByStatus('sent')">Sent</button>
                 <button class="btn btn-secondary btn-sm log-filter-btn" data-status="failed"
@@ -1097,6 +1233,178 @@
     </div>
   </div>
 
+  <!-- MODAL: CREATE DRIP AUTOMATION -->
+  <div class="modal-backdrop" id="modal-create-automation">
+    <div class="modal-dialog" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-orange);">
+            <circle cx="18" cy="18" r="3"></circle>
+            <circle cx="6" cy="6" r="3"></circle>
+            <path d="M6 9v12"></path>
+            <path d="M18 9a9 9 0 0 0-9 9"></path>
+          </svg>
+          Create Daily Drip Automation
+        </h3>
+        <button class="btn-icon" onclick="closeModal('modal-create-automation')">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px;">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
+          Set your custom daily quantity and exact delivery time. The server will automatically dispatch sequentially every day without duplicate sending.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Automation Name:</label>
+            <input type="text" class="form-input" id="auto-create-name" placeholder="e.g. Daily Tech Leads Outreach (10/day)" />
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Dynamic Template:</label>
+              <select class="form-select" id="auto-create-template"></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Audience List:</label>
+              <select class="form-select" id="auto-create-list"></select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Sender Name:</label>
+              <input type="text" class="form-input" id="auto-create-from-name" placeholder="Alpever AI" />
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Sender Email:</label>
+              <input type="email" class="form-input" id="auto-create-from-email" placeholder="onboarding@resend.dev" />
+            </div>
+          </div>
+
+          <!-- Schedule Settings: Custom Quantity & Time -->
+          <div style="background: #fff7ed; border: 1.5px solid #ffedd5; border-radius: 8px; padding: 14px 16px; margin-top: 4px;">
+            <div style="font-size: 13px; font-weight: 700; color: #c2410c; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              Daily Schedule Configuration
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div>
+                <label class="form-label" style="font-size: 12px; font-weight: 700; color: #9a3412;">
+                  Daily Send Quantity:
+                </label>
+                <input type="number" min="1" max="10000" class="form-input" id="auto-create-limit" value="10" placeholder="10" style="background:#fff; font-weight:600;" />
+                <span style="font-size: 11px; color: #9a3412; margin-top: 3px; display:block;">Emails sent per day (e.g. 10, 20, 50)</span>
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 12px; font-weight: 700; color: #9a3412;">
+                  Daily Send Time:
+                </label>
+                <input type="time" class="form-input" id="auto-create-time" value="10:00" style="background:#fff; font-weight:600;" />
+                <span style="font-size: 11px; color: #9a3412; margin-top: 3px; display:block;">Exact time to trigger (HH:MM)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-create-automation')">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-submit-create-auto" onclick="submitCreateAutomation()">
+          Launch Automation &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT AUTOMATION SCHEDULE -->
+  <div class="modal-backdrop" id="modal-edit-automation">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          Edit Automation Settings
+        </h3>
+        <button class="btn-icon" onclick="closeModal('modal-edit-automation')">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px;">
+        <input type="hidden" id="auto-edit-id" />
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Automation Name:</label>
+            <input type="text" class="form-input" id="auto-edit-name" />
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Daily Send Quantity:</label>
+              <input type="number" min="1" max="10000" class="form-input" id="auto-edit-limit" />
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Daily Send Time:</label>
+              <input type="time" class="form-input" id="auto-edit-time" />
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Sender Name:</label>
+            <input type="text" class="form-input" id="auto-edit-from-name" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-edit-automation')">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="submitEditAutomation()">Save Settings &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AUTOMATION RECIPIENT LOGS -->
+  <div class="modal-backdrop" id="modal-automation-logs">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3 class="modal-title" id="auto-logs-title">Automation Delivery Logs</h3>
+        <button class="btn-icon" onclick="closeModal('modal-automation-logs')">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 18px 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <div style="font-size: 13px; color: var(--text-muted);" id="auto-logs-stats-summary">Loading stats...</div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-secondary btn-sm auto-log-filter active" data-status="" onclick="filterAutoLogs('')">All</button>
+            <button class="btn btn-secondary btn-sm auto-log-filter" data-status="sent" onclick="filterAutoLogs('sent')">Sent</button>
+            <button class="btn btn-secondary btn-sm auto-log-filter" data-status="opened" onclick="filterAutoLogs('opened')">Opened</button>
+            <button class="btn btn-secondary btn-sm auto-log-filter" data-status="pending" onclick="filterAutoLogs('pending')">Pending</button>
+            <button class="btn btn-secondary btn-sm auto-log-filter" data-status="failed" onclick="filterAutoLogs('failed')">Failed</button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Recipient</th>
+                <th>Email Address</th>
+                <th>Status</th>
+                <th>Open / Read</th>
+                <th>Dispatched At</th>
+              </tr>
+            </thead>
+            <tbody id="auto-logs-tbody">
+              <tr><td colspan="5" style="text-align: center; padding: 20px;">Loading logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="auto-logs-pagination" class="pagination-bar"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-automation-logs')">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="/js/components/toasts.js?v=2"></script>
   <script src="/js/components/modal.js?v=2"></script>
@@ -1106,6 +1414,7 @@
   <script src="/js/views/contacts.js?v=3"></script>
   <script src="/js/views/templates.js?v=8"></script>
   <script src="/js/views/campaign.js?v=5"></script>
+  <script src="/js/views/automations.js?v=1"></script>
   <script src="/js/views/history.js?v=4"></script>
   <script src="/js/app.js?v=3"></script>
 </body>

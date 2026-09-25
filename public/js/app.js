@@ -39,6 +39,7 @@ function navigateTo(viewName) {
     templates: 'Dynamic Email Templates',
     'template-studio': 'Dynamic Template Studio',
     campaigns: 'Mass Campaigns & Dispatch',
+    automations: 'Scheduled Drip Automations',
     history: 'Audit Logs & Delivery Reports'
   };
 
@@ -51,6 +52,7 @@ function navigateTo(viewName) {
   if (validView === 'contacts' && window.loadContactsView) window.loadContactsView();
   if (validView === 'templates' && window.loadTemplatesView) window.loadTemplatesView();
   if (validView === 'campaigns' && window.loadCampaignsView) window.loadCampaignsView();
+  if (validView === 'automations' && window.loadAutomationsView) window.loadAutomationsView();
   if (validView === 'history' && window.loadHistoryView) window.loadHistoryView();
   if (validView === 'template-studio') {
     if (window.setupLivePreviewListeners) window.setupLivePreviewListeners();

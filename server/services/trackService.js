@@ -20,18 +20,21 @@ function generateTrackingToken(logId, campaignId = 0) {
  * Parse and decode tracking token safely
  */
 function parseTrackingToken(token = '') {
-  if (!token) return { logId: null, campaignId: null };
+  if (!token) return { logId: null, campaignId: null, isAutomation: false };
   try {
     const raw = Buffer.from(token, 'base64url').toString('utf8');
     const [logIdStr, campIdStr] = raw.split(':');
-    const logId = parseInt(logIdStr, 10);
+    const isAuto = logIdStr ? logIdStr.startsWith('auto_') : false;
+    const cleanLogIdStr = isAuto ? logIdStr.replace('auto_', '') : logIdStr;
+    const logId = parseInt(cleanLogIdStr, 10);
     const campaignId = parseInt(campIdStr, 10);
     return {
       logId: isNaN(logId) ? null : logId,
-      campaignId: isNaN(campaignId) ? null : campaignId
+      campaignId: isNaN(campaignId) ? null : campaignId,
+      isAutomation: isAuto
     };
   } catch (e) {
-    return { logId: null, campaignId: null };
+    return { logId: null, campaignId: null, isAutomation: false };
   }
 }
 
@@ -47,9 +50,9 @@ function generateTrackingPixel(logId, campaignId = 0) {
 }
 
 /**
- * Record an email open event in MySQL database
+ * Record an email open event in MySQL database (supports both campaigns and automations)
  */
-async function recordOpenEvent(logId, campaignId, { userAgent = '', ipAddress = '' } = {}) {
+async function recordOpenEvent(logId, campaignId, { userAgent = '', ipAddress = '', isAutomation = false } = {}) {
   if (!logId) return { success: false, reason: 'No logId' };
 
   const pool = getPool();
@@ -59,25 +62,62 @@ async function recordOpenEvent(logId, campaignId, { userAgent = '', ipAddress = 
     const cleanUa = (userAgent || '').substring(0, 500);
     const cleanIp = (ipAddress || '').substring(0, 100);
 
-    // 1. Update the individual recipient log
-    await pool.query(
-      `UPDATE campaign_logs 
-       SET open_count = open_count + 1,
-           opened_at = COALESCE(opened_at, NOW()),
-           user_agent = COALESCE(user_agent, ?),
-           ip_address = COALESCE(ip_address, ?)
-       WHERE id = ?`,
-      [cleanUa, cleanIp, logId]
-    );
-
-    // 2. Update campaign opened_count summary
-    if (campaignId) {
+    if (isAutomation) {
+      // 1. Update automation recipient log
       await pool.query(
-        `UPDATE campaigns 
-         SET opened_count = (SELECT COUNT(DISTINCT id) FROM campaign_logs WHERE campaign_id = ? AND opened_at IS NOT NULL)
+        `UPDATE automation_logs 
+         SET open_count = open_count + 1,
+             opened_at = COALESCE(opened_at, NOW()),
+             user_agent = COALESCE(user_agent, ?),
+             ip_address = COALESCE(ip_address, ?)
          WHERE id = ?`,
-        [campaignId, campaignId]
+        [cleanUa, cleanIp, logId]
       );
+
+      // Resolve automation_id if missing or 0
+      let autoId = campaignId;
+      if (!autoId) {
+        const [aRows] = await pool.query('SELECT automation_id FROM automation_logs WHERE id = ?', [logId]);
+        if (aRows.length) autoId = aRows[0].automation_id;
+      }
+
+      // 2. Update automation summary opened count
+      if (autoId) {
+        await pool.query(
+          `UPDATE automations 
+           SET opened_count = (SELECT COUNT(DISTINCT id) FROM automation_logs WHERE automation_id = ? AND opened_at IS NOT NULL)
+           WHERE id = ?`,
+          [autoId, autoId]
+        );
+      }
+    } else {
+      // 1. Update individual campaign recipient log
+      await pool.query(
+        `UPDATE campaign_logs 
+         SET open_count = open_count + 1,
+             opened_at = COALESCE(opened_at, NOW()),
+             user_agent = COALESCE(user_agent, ?),
+             ip_address = COALESCE(ip_address, ?)
+         WHERE id = ?`,
+        [cleanUa, cleanIp, logId]
+      );
+
+      // Resolve campaign_id if missing or 0
+      let campId = campaignId;
+      if (!campId) {
+        const [cRows] = await pool.query('SELECT campaign_id FROM campaign_logs WHERE id = ?', [logId]);
+        if (cRows.length) campId = cRows[0].campaign_id;
+      }
+
+      // 2. Update campaign opened_count summary
+      if (campId) {
+        await pool.query(
+          `UPDATE campaigns 
+           SET opened_count = (SELECT COUNT(DISTINCT id) FROM campaign_logs WHERE campaign_id = ? AND opened_at IS NOT NULL)
+           WHERE id = ?`,
+          [campId, campId]
+        );
+      }
     }
 
     return { success: true };

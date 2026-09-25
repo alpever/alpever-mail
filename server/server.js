@@ -11,6 +11,8 @@ const contactRouter = require('./routes/contactRoutes');
 const templateRouter = require('./routes/templateRoutes');
 const campaignRouter = require('./routes/campaignRoutes');
 const trackRouter = require('./routes/trackRoutes');
+const automationRouter = require('./routes/automationRoutes');
+const { startAutomationScheduler } = require('./services/automationService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -136,6 +138,7 @@ app.use('/api/contacts', contactRouter);
 app.use('/api/templates', templateRouter);
 app.use('/api/campaigns', campaignRouter);
 app.use('/api/track', trackRouter);
+app.use('/api/automations', automationRouter);
 
 // Fallback to index.html for SPA client-side routes
 app.get('*', (req, res) => {
@@ -204,6 +207,7 @@ app.listen(PORT, async () => {
   const res = await initDB();
   if (res.success) {
     console.log('✅ MySQL Database is connected and ready to use!');
+    startAutomationScheduler();
   } else {
     console.warn('⚠️  MySQL is not connected yet:', res.error);
     console.log('👉 You can configure MySQL credentials anytime from the web app Settings page.');

@@ -23,11 +23,13 @@ router.get('/open/:token?', async (req, res) => {
   const token = req.params.token || req.query.t || '';
   let logId = null;
   let campaignId = null;
+  let isAutomation = false;
 
   if (token) {
     const parsed = parseTrackingToken(token);
     logId = parsed.logId;
     campaignId = parsed.campaignId;
+    isAutomation = parsed.isAutomation;
   } else if (req.query.l) {
     logId = parseInt(req.query.l, 10);
     campaignId = parseInt(req.query.c || '0', 10);
@@ -38,7 +40,7 @@ router.get('/open/:token?', async (req, res) => {
     const ipAddress = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
 
     // Asynchronously record open event in database
-    recordOpenEvent(logId, campaignId, { userAgent, ipAddress }).catch(err => {
+    recordOpenEvent(logId, campaignId, { userAgent, ipAddress, isAutomation }).catch(err => {
       console.warn('Failed to record open event:', err.message);
     });
   }
