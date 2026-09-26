@@ -194,6 +194,119 @@ function resolveEmailImages(html = '') {
 }
 
 /**
+ * Ensures all images and layouts in the email HTML are fully mobile-responsive and never cut off on mobile devices.
+ * - Enforces max-width: 100% and height: auto on images.
+ * - Removes fixed pixel height attributes or styles that prevent fluid scaling on mobile.
+ * - Removes object-fit: cover and aspect-ratio which cause image clipping in mobile WebViews.
+ * - Wraps standalone fragments into a bulletproof responsive HTML email wrapper with viewport & @media queries.
+ */
+function makeEmailMobileResponsive(html = '') {
+  if (!html) return '';
+
+  // 1. Process <img> tags to be strictly mobile-responsive
+  let processedHtml = html.replace(/<img\b([^>]*)>/gi, (match, attrs) => {
+    let newAttrs = attrs;
+
+    // Check if it's a tracking pixel (width="1" height="1" or style with display:none / width:1px)
+    if (/width=["']1["']/i.test(newAttrs) || /height=["']1["']/i.test(newAttrs) || /display:\s*none/i.test(newAttrs)) {
+      return match;
+    }
+
+    // Remove fixed height attribute so mobile email clients don't preserve fixed height box
+    newAttrs = newAttrs.replace(/\s*height=["'][^"']*["']/gi, '');
+
+    // Process style attribute
+    if (/style=["']([^"']*)["']/i.test(newAttrs)) {
+      newAttrs = newAttrs.replace(/style=["']([^"']*)["']/i, (sMatch, styleVal) => {
+        let s = styleVal.trim();
+
+        // Remove fixed height declarations like height: 350px
+        s = s.replace(/height:\s*[^;]+;?/gi, '');
+        // Remove object-fit and aspect-ratio which crop images
+        s = s.replace(/object-fit:\s*[^;]+;?/gi, '');
+        s = s.replace(/object-position:\s*[^;]+;?/gi, '');
+        s = s.replace(/aspect-ratio:\s*[^;]+;?/gi, '');
+
+        // Ensure max-width: 100% and height: auto
+        if (!/max-width\s*:/i.test(s)) {
+          s += '; max-width: 100%;';
+        }
+        s += '; height: auto !important;';
+
+        // Clean double semicolons and whitespace
+        s = s.replace(/;+/g, ';').replace(/^;/, '').trim();
+        return `style="${s}"`;
+      });
+    } else {
+      newAttrs += ' style="max-width: 100%; height: auto !important;"';
+    }
+
+    return `<img ${newAttrs.trim()}>`;
+  });
+
+  // 2. Wrap in responsive email layout if not already a full HTML document
+  if (!/<html[\s>]/i.test(processedHtml)) {
+    return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <style type="text/css">
+    * {
+      box-sizing: border-box !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      -webkit-text-size-adjust: 100% !important;
+      -ms-text-size-adjust: 100% !important;
+    }
+    img {
+      max-width: 100% !important;
+      height: auto !important;
+      -ms-interpolation-mode: bicubic;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+      }
+      .email-image-block {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .email-image-block img,
+      img {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 20px 12px; background-color: #ffffff; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.65; word-break: break-word;">
+  <div class="email-container" style="max-width: 600px; margin: 0 auto; width: 100%;">
+    ${processedHtml}
+  </div>
+</body>
+</html>`;
+  }
+
+  // If already an HTML document, ensure responsive meta tag and styles exist in <head>
+  if (!/<meta[^>]*viewport/i.test(processedHtml) && /<head[^>]*>/i.test(processedHtml)) {
+    processedHtml = processedHtml.replace(/<head[^>]*>/i, match => {
+      return `${match}\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <style type="text/css">img{max-width:100%!important;height:auto!important;}@media only screen and (max-width:600px){img{width:100%!important;max-width:100%!important;height:auto!important;}}</style>`;
+    });
+  }
+
+  return processedHtml;
+}
+
+/**
  * Render complete email object (subject + html) for a given contact
  */
 function renderEmail(template, contact, extraVars = {}) {
@@ -203,6 +316,9 @@ function renderEmail(template, contact, extraVars = {}) {
 
   // Ensure all image URLs are email-client safe
   html = resolveEmailImages(html);
+
+  // Make all images and email structure 100% mobile-responsive for all email clients (Gmail, Outlook, Yahoo, Apple Mail)
+  html = makeEmailMobileResponsive(html);
 
   return {
     to: contact.email,

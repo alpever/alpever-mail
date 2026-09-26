@@ -138,4 +138,19 @@ assert.strictEqual(TRANSPARENT_1X1_GIF.length, 42, 'Transparent GIF must be exac
 assert(TRANSPARENT_1X1_GIF.toString('ascii').startsWith('GIF89a'), 'Buffer must be valid GIF89a header');
 console.log('  ✓ 42-byte transparent GIF header validated');
 
+// 6. Mobile Responsiveness Tests
+console.log('\n6️⃣ Testing Mobile Email Responsiveness & Image Optimization...');
+const sampleDesktopTemplate = {
+  subject: 'Test Mobile Responsiveness',
+  body_html: '<p>Hello</p><img src="https://example.com/banner.jpg" width="533" height="350" style="width: 533px; height: 350px; object-fit: cover; aspect-ratio: 533 / 350;">'
+};
+const renderedMobile = renderEmail(sampleDesktopTemplate, { email: 'test@example.com' });
+assert(!renderedMobile.html.includes('height="350"'), 'Fixed height attribute must be removed for mobile');
+assert(!renderedMobile.html.includes('object-fit: cover'), 'object-fit: cover must be removed to prevent mobile clipping');
+assert(!renderedMobile.html.includes('aspect-ratio:'), 'aspect-ratio must be removed');
+assert(renderedMobile.html.includes('max-width: 100%'), 'max-width: 100% must be present');
+assert(renderedMobile.html.includes('height: auto'), 'height: auto must be present');
+assert(renderedMobile.html.includes('<meta name="viewport" content="width=device-width, initial-scale=1.0">'), 'Viewport meta tag must be included for mobile email clients');
+console.log('  ✓ Email correctly optimized with responsive mobile layout and non-clipping image styles');
+
 console.log('\n🎉 ALL UNIT TESTS PASSED SUCCESSFULLY! Everything is working properly.');

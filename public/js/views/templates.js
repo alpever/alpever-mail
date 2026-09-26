@@ -467,17 +467,14 @@ function syncVisualToCode() {
   const visualEditor = document.getElementById('tpl-visual-editor');
   const codeEditor = document.getElementById('tpl-input-html');
   if (visualEditor && codeEditor) {
-    // Ensure all cropped/sized images have their exact aspect-ratio persisted for email clients
+    // Ensure all images are 100% mobile-responsive and never cut off on phones
     visualEditor.querySelectorAll('img').forEach(img => {
-      if (img.style.objectFit === 'cover' || (img.style.height && img.style.height !== 'auto')) {
-        const w = Math.round(parseFloat(img.style.width) || img.getBoundingClientRect().width);
-        const h = Math.round(parseFloat(img.style.height) || img.getBoundingClientRect().height);
-        if (w > 0 && h > 0) {
-          img.style.aspectRatio = `${w} / ${h}`;
-          if (!img.getAttribute('width')) img.setAttribute('width', w);
-          if (!img.getAttribute('height')) img.setAttribute('height', h);
-        }
-      }
+      img.style.maxWidth = '100%';
+      // For email client safety, make sure height is auto and never fixed px that crops or distorts on mobile
+      img.style.height = 'auto';
+      img.removeAttribute('height');
+      img.style.objectFit = '';
+      img.style.aspectRatio = '';
     });
 
     let cleanHtml = visualEditor.innerHTML;
@@ -749,7 +746,29 @@ async function saveTemplateFromStudio() {
     syncVisualToCode();
   }
 
-  const body_html = document.getElementById('tpl-input-html').value.trim();
+  let body_html = document.getElementById('tpl-input-html').value.trim();
+
+  // Ensure all images are strictly mobile-friendly before saving
+  body_html = body_html.replace(/<img\b([^>]*)>/gi, (match, attrs) => {
+    let newAttrs = attrs;
+    if (/width=["']1["']/i.test(newAttrs) || /height=["']1["']/i.test(newAttrs)) return match;
+    newAttrs = newAttrs.replace(/\s*height=["'][^"']*["']/gi, '');
+    if (/style=["']([^"']*)["']/i.test(newAttrs)) {
+      newAttrs = newAttrs.replace(/style=["']([^"']*)["']/i, (sMatch, styleVal) => {
+        let s = styleVal.trim();
+        s = s.replace(/height:\s*[^;]+;?/gi, '');
+        s = s.replace(/object-fit:\s*[^;]+;?/gi, '');
+        s = s.replace(/aspect-ratio:\s*[^;]+;?/gi, '');
+        if (!/max-width\s*:/i.test(s)) s += '; max-width: 100%;';
+        s += '; height: auto;';
+        s = s.replace(/;+/g, ';').replace(/^;/, '').trim();
+        return `style="${s}"`;
+      });
+    } else {
+      newAttrs += ' style="max-width: 100%; height: auto;"';
+    }
+    return `<img ${newAttrs.trim()}>`;
+  });
 
   if (!name || !subject || !body_html) {
     showToast('Please provide Template Name, Subject, and Email Content', 'warning');
@@ -1435,16 +1454,15 @@ function setImagePresetWidth(preset) {
 
   activeSelectedImage.style.width = preset;
   activeSelectedImage.style.maxWidth = '100%';
+  activeSelectedImage.style.height = 'auto';
+  activeSelectedImage.removeAttribute('height');
+  activeSelectedImage.style.objectFit = '';
+  activeSelectedImage.style.aspectRatio = '';
 
   const visualEditor = document.getElementById('tpl-visual-editor');
   const canvasWidth = visualEditor ? visualEditor.clientWidth - 72 : 600;
   const approxPx = Math.round(canvasWidth * (parseInt(preset, 10) / 100));
   activeSelectedImage.setAttribute('width', approxPx);
-
-  // If height was not explicitly fixed, keep it auto, otherwise preserve banner height
-  if (!activeSelectedImage.style.height) {
-    activeSelectedImage.style.height = 'auto';
-  }
 
   updateResizerOverlayPosition();
   updateFloatingToolbarValues();
@@ -1460,11 +1478,10 @@ function setImagePixelWidth(val) {
   activeSelectedImage.style.width = `${px}px`;
   activeSelectedImage.style.maxWidth = '100%';
   activeSelectedImage.setAttribute('width', px);
-
-  const curH = parseFloat(activeSelectedImage.style.height) || (activeSelectedImage.style.objectFit === 'cover' ? activeSelectedImage.getBoundingClientRect().height : 0);
-  if (curH > 0 && px > 0) {
-    activeSelectedImage.style.aspectRatio = `${px} / ${Math.round(curH)}`;
-  }
+  activeSelectedImage.style.height = 'auto';
+  activeSelectedImage.removeAttribute('height');
+  activeSelectedImage.style.objectFit = '';
+  activeSelectedImage.style.aspectRatio = '';
 
   updateResizerOverlayPosition();
   updateFloatingToolbarValues();
@@ -1636,10 +1653,10 @@ function setupImageDragResizing() {
 
           activeSelectedImage.style.width = `${Math.round(newWidth)}px`;
           activeSelectedImage.setAttribute('width', Math.round(newWidth));
-          // Explicitly keep height unchanged as requested!
-          activeSelectedImage.style.height = `${Math.round(startHeight)}px`;
-          activeSelectedImage.setAttribute('height', Math.round(startHeight));
-          activeSelectedImage.style.objectFit = 'cover';
+          activeSelectedImage.style.maxWidth = '100%';
+          activeSelectedImage.style.height = 'auto';
+          activeSelectedImage.removeAttribute('height');
+          activeSelectedImage.style.objectFit = '';
         } else if (handleType === 'w') {
           newWidth = startWidth - deltaX;
           if (newWidth < 40) newWidth = 40;
@@ -1647,10 +1664,10 @@ function setupImageDragResizing() {
 
           activeSelectedImage.style.width = `${Math.round(newWidth)}px`;
           activeSelectedImage.setAttribute('width', Math.round(newWidth));
-          // Explicitly keep height unchanged as requested!
-          activeSelectedImage.style.height = `${Math.round(startHeight)}px`;
-          activeSelectedImage.setAttribute('height', Math.round(startHeight));
-          activeSelectedImage.style.objectFit = 'cover';
+          activeSelectedImage.style.maxWidth = '100%';
+          activeSelectedImage.style.height = 'auto';
+          activeSelectedImage.removeAttribute('height');
+          activeSelectedImage.style.objectFit = '';
         }
         // 2. HEIGHT ONLY RESIZING (North or South handles)
         else if (handleType === 's') {
@@ -1658,21 +1675,17 @@ function setupImageDragResizing() {
           if (newHeight < 25) newHeight = 25;
 
           activeSelectedImage.style.height = `${Math.round(newHeight)}px`;
-          activeSelectedImage.setAttribute('height', Math.round(newHeight));
-          // Width stays unchanged!
           activeSelectedImage.style.width = `${Math.round(startWidth)}px`;
           activeSelectedImage.setAttribute('width', Math.round(startWidth));
-          activeSelectedImage.style.objectFit = 'cover';
+          activeSelectedImage.style.maxWidth = '100%';
         } else if (handleType === 'n') {
           newHeight = startHeight - deltaY;
           if (newHeight < 25) newHeight = 25;
 
           activeSelectedImage.style.height = `${Math.round(newHeight)}px`;
-          activeSelectedImage.setAttribute('height', Math.round(newHeight));
-          // Width stays unchanged!
           activeSelectedImage.style.width = `${Math.round(startWidth)}px`;
           activeSelectedImage.setAttribute('width', Math.round(startWidth));
-          activeSelectedImage.style.objectFit = 'cover';
+          activeSelectedImage.style.maxWidth = '100%';
         }
         // 3. CORNER HANDLES (nw, ne, se, sw)
         else {
@@ -1686,11 +1699,12 @@ function setupImageDragResizing() {
           if (newWidth > maxAllowedWidth) newWidth = maxAllowedWidth;
 
           if (isAspectRatioLocked && !moveEvt.shiftKey) {
-            newHeight = newWidth / aspectRatio;
             activeSelectedImage.style.width = `${Math.round(newWidth)}px`;
             activeSelectedImage.setAttribute('width', Math.round(newWidth));
-            activeSelectedImage.style.height = `${Math.round(newHeight)}px`;
-            activeSelectedImage.setAttribute('height', Math.round(newHeight));
+            activeSelectedImage.style.maxWidth = '100%';
+            activeSelectedImage.style.height = 'auto';
+            activeSelectedImage.removeAttribute('height');
+            activeSelectedImage.style.objectFit = '';
           } else {
             // Free 2D resizing!
             if (handleType === 'se' || handleType === 'sw') {
@@ -1703,14 +1717,10 @@ function setupImageDragResizing() {
             activeSelectedImage.style.width = `${Math.round(newWidth)}px`;
             activeSelectedImage.setAttribute('width', Math.round(newWidth));
             activeSelectedImage.style.height = `${Math.round(newHeight)}px`;
-            activeSelectedImage.setAttribute('height', Math.round(newHeight));
-            activeSelectedImage.style.objectFit = 'cover';
+            activeSelectedImage.style.maxWidth = '100%';
           }
         }
 
-        if (newWidth > 0 && newHeight > 0) {
-          activeSelectedImage.style.aspectRatio = `${Math.round(newWidth)} / ${Math.round(newHeight)}`;
-        }
         activeSelectedImage.style.maxWidth = '100%';
         updateResizerOverlayPosition();
 

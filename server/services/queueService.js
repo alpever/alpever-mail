@@ -189,7 +189,9 @@ async function executeCampaign(campaignId, apiKey) {
 
           // Append invisible open tracking pixel
           const trackingTag = generateTrackingPixel(logItem.id, campaignId);
-          const finalHtml = `${rendered.html}\n${trackingTag}`;
+          const finalHtml = rendered.html.includes('</body>')
+            ? rendered.html.replace('</body>', `${trackingTag}\n</body>`)
+            : `${rendered.html}\n${trackingTag}`;
 
           emailBatch.push({
             from: `${campaign.from_name} <${campaign.from_email}>`,
